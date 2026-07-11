@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>羽毛球球费即时计算器</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
   <!-- Google Fonts for TradingView premium typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,7 +16,7 @@
     <!-- Header resembling TradingView style top bar with Toggle Button -->
     <header class="tv-header">
       <div class="tv-logo-area">
-        <span class="tv-icon">⚡</span>
+        <img class="tv-logo" src="logo.png" alt="Logo">
         <span class="tv-title">BADMINTON COST TICKER</span>
       </div>
       <button id="toggle-view-btn" class="tv-btn-toggle" title="切换显示/收款码">
@@ -103,6 +104,25 @@
                     <span class="slider-boundary-label">12h</span>
                   </div>
                   <div id="time-range-display" class="time-range-banner">4:00 PM - 6:00 PM</div>
+                </div>
+
+                <!-- Court Count Radio Segmented Control -->
+                <div class="input-group">
+                  <label>场地数量</label>
+                  <div class="segmented-control">
+                    <label>
+                      <input type="radio" name="court-count" value="1" checked>
+                      <span>1 片</span>
+                    </label>
+                    <label>
+                      <input type="radio" name="court-count" value="2">
+                      <span>2 片</span>
+                    </label>
+                    <label>
+                      <input type="radio" name="court-count" value="3">
+                      <span>3 片</span>
+                    </label>
+                  </div>
                 </div>
 
                 <!-- Calculated Court Fee Display (Visually occupies Row 2 per requirement, but non-editable) -->
