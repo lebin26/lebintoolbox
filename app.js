@@ -121,11 +121,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // 3. Compute dynamic court fee
     const { fee: baseCourtFee, breakdown } = calculateCourtFee(startHour, duration);
     const courtCountRadio = document.querySelector('input[name="court-count"]:checked');
-    const courtCount = courtCountRadio ? parseInt(courtCountRadio.value) : 1;
+    const courtCount = courtCountRadio ? parseInt(courtCountRadio.value) : 0;
     const courtFee = baseCourtFee * courtCount;
     
     courtFeeInput.value = formatCurrency(courtFee);
-    courtFeeBreakdown.textContent = breakdown + (courtCount > 1 ? ` × ${courtCount}` : '');
+    courtFeeBreakdown.textContent = courtCount === 0 ? '未选择场地' : (breakdown + (courtCount > 1 ? ` × ${courtCount}` : ''));
 
     // 4. Determine paying players
     const payingPlayers = totalPlayers - hostCount;
@@ -262,9 +262,18 @@ document.addEventListener('DOMContentLoaded', () => {
   shuttlePriceInput.addEventListener('input', calculate);
   additionalFeeInput.addEventListener('input', calculate);
 
-  // Add listener for court count radio group change
+  // Track selected court count radio to support toggle/deselect
+  let selectedRadio = document.querySelector('input[name="court-count"]:checked');
   document.querySelectorAll('input[name="court-count"]').forEach(radio => {
-    radio.addEventListener('change', calculate);
+    radio.addEventListener('click', () => {
+      if (radio === selectedRadio) {
+        radio.checked = false;
+        selectedRadio = null;
+      } else {
+        selectedRadio = radio;
+      }
+      calculate();
+    });
   });
 
   // Auto-format currency inputs on blur
