@@ -479,6 +479,20 @@ input[type="number"] {
   flex-grow: 1;
 }
 
+.picker-toggle-icon {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  transition: transform var(--transition-speed), color var(--transition-speed);
+}
+
+.toggle-trigger:hover .picker-toggle-icon {
+  color: var(--color-text-accent);
+}
+
+.toggle-trigger:active .picker-toggle-icon {
+  transform: scale(1.15);
+}
+
 /* Custom duration box configuration */
 .court-fee-config-box {
   background-color: rgba(30, 34, 45, 0.3);

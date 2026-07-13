@@ -182,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeHiddenInput = null;
   let activeDisplayEl = null;
 
-  function openDrawer(title, min, max, currentVal, hiddenInput, displayEl, isHost = false) {
+  function openDrawer(title, min, max, currentVal, hiddenInput, displayEl) {
     activeHiddenInput = hiddenInput;
     activeDisplayEl = displayEl;
 
@@ -190,11 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
     drawerBody.innerHTML = ''; // Clear previous content
 
     const container = document.createElement('div');
-    if (isHost) {
-      container.className = 'drawer-options-row';
-    } else {
-      container.className = 'drawer-options-grid';
-    }
+    container.className = 'drawer-options-grid';
 
     for (let i = min; i <= max; i++) {
       const cell = document.createElement('div');
@@ -231,19 +227,22 @@ document.addEventListener('DOMContentLoaded', () => {
   playersPickerTrigger.addEventListener('click', (e) => {
     e.stopPropagation();
     const current = parseInt(totalPlayersInput.value) || 12;
-    openDrawer("选择参与人数 (含Host)", 1, 40, current, totalPlayersInput, playersDisplayVal, false);
+    openDrawer("选择参与人数 (含Host)", 1, 40, current, totalPlayersInput, playersDisplayVal);
   });
 
   shuttlesPickerTrigger.addEventListener('click', (e) => {
     e.stopPropagation();
     const current = parseInt(shuttlesUsedInput.value) || 8;
-    openDrawer("选择用球数量 (个)", 1, 24, current, shuttlesUsedInput, shuttlesDisplayVal, false);
+    openDrawer("选择用球数量 (个)", 1, 24, current, shuttlesUsedInput, shuttlesDisplayVal);
   });
 
   hostPickerTrigger.addEventListener('click', (e) => {
     e.stopPropagation();
     const current = parseInt(hostCountInput.value) || 2;
-    openDrawer("选择 Host 人数", 1, 2, current, hostCountInput, hostDisplayVal, true);
+    const next = current === 1 ? 2 : 1;
+    hostCountInput.value = next;
+    hostDisplayVal.textContent = next;
+    calculate();
   });
 
   // Drawer Close events
