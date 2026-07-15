@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const totalCostDisplay = document.getElementById('total-cost-display');
   const totalRevenueDisplay = document.getElementById('total-revenue-display');
   const netProfitDisplay = document.getElementById('net-profit-display');
-  
+
   // Containers & Overlays
   const profitRow = document.getElementById('profit-row');
   const errorBanner = document.getElementById('error-banner');
@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sequence.push("晚");
       }
     }
-    
+
     return {
       fee: totalFee,
       breakdown: sequence.join("+")
@@ -123,9 +123,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const courtCountRadio = document.querySelector('input[name="court-count"]:checked');
     const courtCount = courtCountRadio ? parseInt(courtCountRadio.value) : 0;
     const courtFee = baseCourtFee * courtCount;
-    
+
     courtFeeInput.value = formatCurrency(courtFee);
     courtFeeBreakdown.textContent = courtCount === 0 ? '未选择场地' : (breakdown + (courtCount > 1 ? ` × ${courtCount}` : ''));
+
+    // Compute costs early
+    const shuttleCost = (shuttlesUsed * shuttlePrice) / 12;
+    const totalCost = courtFee + shuttleCost;
+
+    // Calculate bottom reference comparison cards (0 to 2 Hosts)
+    for (let h = 0; h <= 2; h++) {
+      const paying = totalPlayers - h;
+      const displayEl = document.getElementById(`host-rate-${h}-display`);
+      const cardEl = document.getElementById(`host-rate-${h}`);
+
+      if (displayEl && cardEl) {
+        if (paying <= 0) {
+          displayEl.textContent = '--';
+        } else {
+          const fee = (totalCost / paying) + additionalFee;
+          displayEl.textContent = formatCurrency(fee);
+        }
+
+        // Highlight active host card
+        if (hostCount === h) {
+          cardEl.classList.add('active');
+        } else {
+          cardEl.classList.remove('active');
+        }
+      }
+    }
 
     // 4. Determine paying players
     const payingPlayers = totalPlayers - hostCount;
@@ -135,35 +162,26 @@ document.addEventListener('DOMContentLoaded', () => {
       errorBanner.classList.remove('hidden');
       playerFeeDisplay.textContent = '--';
       playerFeeDisplay.className = 'ticker-price error-state';
-      
-      const totalCost = courtFee + (shuttlesUsed * shuttlePrice / 12);
+
       totalCostDisplay.textContent = formatCurrency(totalCost);
       totalRevenueDisplay.textContent = '--';
       netProfitDisplay.textContent = '--';
-      
+
       profitRow.className = 'summary-row profit-highlight';
       return;
     }
 
     errorBanner.classList.add('hidden');
 
-    // 6. Run badminton calculations (Method A: exact float math internally)
-    const shuttleCost = (shuttlesUsed * shuttlePrice) / 12;
-    const totalCost = courtFee + shuttleCost;
-    
-    // 每人收费 = (场地费 + 球费) / 缴费人数 + 附加收费
+    // 6. Run calculations
     const playerFee = (totalCost / payingPlayers) + additionalFee;
-    
-    // 总收款 = 每人收费 * 缴费人数
     const totalRevenue = playerFee * payingPlayers;
-    
-    // 净利润 = 总收款 - 总成本
     const netProfit = totalRevenue - totalCost;
 
     // 7. Update UI with formatted values
     playerFeeDisplay.textContent = formatCurrency(playerFee);
     playerFeeDisplay.className = 'ticker-price has-value';
-    
+
     totalCostDisplay.textContent = formatCurrency(totalCost);
     totalRevenueDisplay.textContent = formatCurrency(totalRevenue);
     netProfitDisplay.textContent = formatCurrency(netProfit);
@@ -204,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update value
         activeHiddenInput.value = i;
         activeDisplayEl.textContent = i;
-        
+
         // Recalculate and Close
         calculate();
         closeDrawer();
@@ -226,29 +244,118 @@ document.addEventListener('DOMContentLoaded', () => {
   // Bind trigger clicks
   playersPickerTrigger.addEventListener('click', (e) => {
     e.stopPropagation();
-    const current = parseInt(totalPlayersInput.value) || 12;
+    const current = parseInt(totalPlayersInput.value) || 6;
     openDrawer("选择参与人数 (含Host)", 1, 40, current, totalPlayersInput, playersDisplayVal);
   });
 
   shuttlesPickerTrigger.addEventListener('click', (e) => {
     e.stopPropagation();
-    const current = parseInt(shuttlesUsedInput.value) || 8;
+    const current = parseInt(shuttlesUsedInput.value) || 3;
     openDrawer("选择用球数量 (个)", 1, 24, current, shuttlesUsedInput, shuttlesDisplayVal);
   });
 
-  hostPickerTrigger.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const current = parseInt(hostCountInput.value) || 2;
-    const next = current === 1 ? 2 : 1;
-    hostCountInput.value = next;
-    hostDisplayVal.textContent = next;
-    calculate();
+  if (hostPickerTrigger) {
+    hostPickerTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const current = parseInt(hostCountInput.value) || 0;
+      let next = 1;
+      if (current === 0) next = 1;
+      else if (current === 1) next = 2;
+      else if (current === 2) next = 0;
+      else next = 0;
+      hostCountInput.value = next;
+      if (hostDisplayVal) hostDisplayVal.textContent = next;
+      calculate();
+    });
+  }
+
+  // Direct Host Rates cards selection clicks
+  document.querySelectorAll('.host-rate-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const hostVal = parseInt(card.getAttribute('data-host'));
+      if (!isNaN(hostVal)) {
+        hostCountInput.value = hostVal;
+        if (hostDisplayVal) hostDisplayVal.textContent = hostVal;
+        calculate();
+      }
+    });
+  });
+
+  // --- Sliding and Clicking for Court Count Control ---
+  const courtSegmented = document.getElementById('court-segmented-control');
+  const courtRadios = document.querySelectorAll('input[name="court-count"]');
+  let isDraggingCourt = false;
+  let selectedRadio = document.querySelector('input[name="court-count"]:checked');
+
+  function updateCourtFromCoords(clientX) {
+    const rect = courtSegmented.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const percentage = x / rect.width;
+    let value = 1;
+    if (percentage < 0.33) {
+      value = 1;
+    } else if (percentage < 0.66) {
+      value = 2;
+    } else {
+      value = 3;
+    }
+
+    const targetRadio = document.getElementById(`court-${value}`);
+    if (targetRadio && !targetRadio.checked) {
+      targetRadio.checked = true;
+      targetRadio.dispatchEvent(new Event('change'));
+    }
+  }
+
+  courtSegmented.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    isDraggingCourt = true;
+    courtSegmented.classList.add('dragging');
+    updateCourtFromCoords(e.clientX);
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (isDraggingCourt) {
+      updateCourtFromCoords(e.clientX);
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (isDraggingCourt) {
+      isDraggingCourt = false;
+      courtSegmented.classList.remove('dragging');
+    }
+  });
+
+  courtSegmented.addEventListener('touchstart', (e) => {
+    isDraggingCourt = true;
+    courtSegmented.classList.add('dragging');
+    updateCourtFromCoords(e.touches[0].clientX);
+  }, { passive: true });
+
+  courtSegmented.addEventListener('touchmove', (e) => {
+    if (isDraggingCourt) {
+      updateCourtFromCoords(e.touches[0].clientX);
+    }
+  }, { passive: true });
+
+  courtSegmented.addEventListener('touchend', () => {
+    if (isDraggingCourt) {
+      isDraggingCourt = false;
+      courtSegmented.classList.remove('dragging');
+    }
+  });
+
+  // Track selected court count radio changes
+  courtRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+      calculate();
+    });
   });
 
   // Drawer Close events
   drawerCloseBtn.addEventListener('click', closeDrawer);
   drawerOverlay.addEventListener('click', (e) => {
-    // Only close if user clicked directly on the overlay backdrop
     if (e.target === drawerOverlay) {
       closeDrawer();
     }
@@ -260,20 +367,6 @@ document.addEventListener('DOMContentLoaded', () => {
   durationSlider.addEventListener('change', calculate);
   shuttlePriceInput.addEventListener('input', calculate);
   additionalFeeInput.addEventListener('input', calculate);
-
-  // Track selected court count radio to support toggle/deselect
-  let selectedRadio = document.querySelector('input[name="court-count"]:checked');
-  document.querySelectorAll('input[name="court-count"]').forEach(radio => {
-    radio.addEventListener('click', () => {
-      if (radio === selectedRadio) {
-        radio.checked = false;
-        selectedRadio = null;
-      } else {
-        selectedRadio = radio;
-      }
-      calculate();
-    });
-  });
 
   // Auto-format currency inputs on blur
   [shuttlePriceInput, additionalFeeInput].forEach(input => {
@@ -334,8 +427,8 @@ document.addEventListener('DOMContentLoaded', () => {
   swipeViewport.addEventListener('touchstart', (e) => {
     // Avoid swiping if touching inputs, range sliders, or picker drawers
     if (
-      e.target.closest('#duration-slider') || 
-      e.target.closest('.drawer-sheet') || 
+      e.target.closest('#duration-slider') ||
+      e.target.closest('.drawer-sheet') ||
       e.target.closest('.picker-trigger') ||
       e.target.closest('select') ||
       e.target.closest('input')
@@ -358,7 +451,7 @@ document.addEventListener('DOMContentLoaded', () => {
     isSwiping = false;
     const diffX = startX - currentX;
     const swipeThreshold = 60; // minimum distance in px
-    
+
     if (Math.abs(diffX) > swipeThreshold) {
       if (diffX > 0 && currentPage === 0) {
         setPage(1); // Swipe left -> QR Code page
