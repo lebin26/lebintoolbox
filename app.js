@@ -389,11 +389,11 @@ document.addEventListener('DOMContentLoaded', () => {
     currentPage = pageIndex;
     if (pageIndex === 0) {
       swipeTrack.style.transform = 'translateX(0%)';
-      toggleViewBtn.innerHTML = '<span class="btn-icon">📱</span><span class="btn-text">收款码</span>';
+      toggleViewBtn.innerHTML = '<span class="btn-icon">📱</span><span class="btn-text">DuitNow-QR</span>';
       toggleViewBtn.classList.remove('active');
     } else {
       swipeTrack.style.transform = 'translateX(-50%)';
-      toggleViewBtn.innerHTML = '<span class="btn-icon">📊</span><span class="btn-text">计算器</span>';
+      toggleViewBtn.innerHTML = '<span class="btn-icon">📊</span><span class="btn-text">Calculator</span>';
       toggleViewBtn.classList.add('active');
     }
 
