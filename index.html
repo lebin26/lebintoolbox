@@ -28,10 +28,36 @@
         <img class="tv-logo" src="assets/logo.png" alt="Logo">
         <span class="tv-title">Host Calculator</span>
       </div>
-      <button id="toggle-view-btn" class="tv-btn-toggle" title="Toggle View">
-        <span class="btn-icon">📱</span>
-        <span class="btn-text">DuitNow-QR</span>
-      </button>
+      <div class="tv-header-actions">
+        <button id="toggle-view-btn" class="tv-btn-toggle" title="Toggle View">
+          <span class="btn-icon">📱</span>
+          <span class="btn-text">DuitNow-QR</span>
+        </button>
+        <div class="settings-container">
+          <button id="settings-btn" class="tv-btn-settings" title="Settings">
+            <span class="btn-icon">⚙️</span>
+          </button>
+          <div id="settings-dropdown" class="settings-dropdown hidden">
+            <div class="settings-section">
+              <div class="settings-section-title">切换显示模式</div>
+              <div class="theme-options">
+                <button class="theme-opt-btn" data-theme="dark">
+                  <span class="opt-icon">🌙</span>
+                  <span class="opt-text">深色</span>
+                </button>
+                <button class="theme-opt-btn" data-theme="light">
+                  <span class="opt-icon">☀️</span>
+                  <span class="opt-text">浅色</span>
+                </button>
+                <button class="theme-opt-btn" data-theme="system">
+                  <span class="opt-icon">💻</span>
+                  <span class="opt-text">跟随系统</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </header>
 
     <main class="calculator-card">

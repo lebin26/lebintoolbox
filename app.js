@@ -1,9 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
   // ==========================================================================
-  // 1. DOM Element Cache (Cached once on load to avoid repetitive queries)
+  // 1. DOM Element Cache
   // ==========================================================================
   
-  // Input elements (Dropdowns, Hidden, and Standard inputs)
+  // Input elements
   const startTimeSelect = document.getElementById('start-time-select');
   const durationSlider = document.getElementById('duration-slider');
   const shuttlesUsedInput = document.getElementById('shuttles-used');
@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const hostCountInput = document.getElementById('host-count');
   const additionalFeeInput = document.getElementById('additional-fee');
 
-  // Trigger elements (that toggle panels or drawers)
+  // Trigger elements
   const durationTrigger = document.getElementById('duration-trigger');
   const durationDisplay = document.getElementById('duration-display');
   const durationSliderPanel = document.getElementById('duration-slider-panel');
@@ -24,9 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const playersPickerTrigger = document.getElementById('players-picker');
   const playersDisplayVal = document.getElementById('players-display');
-
-  const hostPickerTrigger = document.getElementById('host-picker');
-  const hostDisplayVal = document.getElementById('host-display');
 
   // Output elements
   const courtFeeInput = document.getElementById('court-fee');
@@ -104,28 +101,40 @@ document.addEventListener('DOMContentLoaded', () => {
   // Calculate dynamic court fee based on starting hour and duration
   function calculateCourtFee(startHour, duration) {
     let totalFee = 0;
-    let sequence = [];
+    let hasMorning = false;
+    let hasEvening = false;
 
     for (let h = 0; h < duration; h++) {
       const hourOfDay = (startHour + h) % 24;
-      // Morning is 12am (0) to 6pm (18:00) -> [0, 17]
       if (hourOfDay >= 0 && hourOfDay < 18) {
         totalFee += RATE_MORNING;
-        sequence.push("早");
+        hasMorning = true;
       } else {
         totalFee += RATE_EVENING;
-        sequence.push("晚");
+        hasEvening = true;
       }
     }
 
     return {
       fee: totalFee,
-      breakdown: sequence.join("+")
+      hasMorning,
+      hasEvening
     };
   }
 
+  // Perceived performance: micro-animation text updater
+  function triggerSpark(el, newVal) {
+    if (el && el.textContent !== newVal) {
+      el.textContent = newVal;
+      // Restart CSS animation
+      el.classList.remove('price-spark-anim');
+      void el.offsetWidth; // Force layout reflow
+      el.classList.add('price-spark-anim');
+    }
+  }
+
   // ==========================================================================
-  // 2. Main Calculation Loop (Optimized to use cached elements)
+  // 2. Main Calculation Loop
   // ==========================================================================
   function calculate() {
     // 1. Gather input parameters
@@ -145,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
     durationDisplay.textContent = `${duration} 小时`;
     sliderValBubble.textContent = `${duration} 小时`;
 
-    // 3. Compute dynamic court fee (Optimized read via loop instead of querySelector)
+    // 3. Compute dynamic court fee
     let courtCount = 0;
     for (let i = 0; i < courtRadios.length; i++) {
       if (courtRadios[i].checked) {
@@ -153,29 +162,51 @@ document.addEventListener('DOMContentLoaded', () => {
         break;
       }
     }
-    const { fee: baseCourtFee, breakdown } = calculateCourtFee(startHour, duration);
+    const { fee: baseCourtFee, hasMorning, hasEvening } = calculateCourtFee(startHour, duration);
     const courtFee = baseCourtFee * courtCount;
 
     courtFeeInput.value = formatCurrency(courtFee);
-    courtFeeBreakdown.textContent = courtCount === 0 ? '未选择场地' : (breakdown + (courtCount > 1 ? ` × ${courtCount}` : ''));
 
-    // Compute costs early
+    if (courtCount === 0) {
+      courtFeeBreakdown.innerHTML = '<span class="breakdown-text">未选择场地</span>';
+    } else {
+      const multText = courtCount > 1 ? ` × ${courtCount}` : '';
+      if (hasMorning && hasEvening) {
+        courtFeeBreakdown.innerHTML = `
+          <div class="breakdown-double-container">
+            <div class="breakdown-double">
+              <span class="breakdown-row" title="早场">🌞</span>
+              <span class="breakdown-row" title="晚场">🌙</span>
+            </div>
+            ${multText ? `<span class="breakdown-multiplier">${multText}</span>` : ''}
+          </div>
+        `;
+      } else if (hasMorning) {
+        courtFeeBreakdown.innerHTML = `<span class="breakdown-single" title="早场">🌞${multText}</span>`;
+      } else if (hasEvening) {
+        courtFeeBreakdown.innerHTML = `<span class="breakdown-single" title="晚场">🌙${multText}</span>`;
+      } else {
+        courtFeeBreakdown.innerHTML = '<span class="breakdown-text">未选择时间</span>';
+      }
+    }
+
+    // Compute costs
     const shuttleCost = (shuttlesUsed * shuttlePrice) / 12;
     const totalCost = courtFee + shuttleCost;
 
-    // Calculate bottom reference comparison cards (0 to 2 Hosts)
+    // Calculate bottom reference cards (0 to 2 Hosts)
     for (let h = 0; h <= 2; h++) {
       const paying = totalPlayers - h;
       const displayEl = hostRateDisplays[h];
       const cardEl = hostRateCards[h];
 
       if (displayEl && cardEl) {
-        if (paying <= 0) {
-          displayEl.textContent = '--';
-        } else {
+        let feeStr = '--';
+        if (paying > 0) {
           const fee = (totalCost / paying) + additionalFee;
-          displayEl.textContent = formatCurrency(fee);
+          feeStr = formatCurrency(fee);
         }
+        triggerSpark(displayEl, feeStr);
 
         // Highlight active host card
         if (hostCount === h) {
@@ -192,12 +223,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // 5. Validation: Avoid division by zero
     if (payingPlayers <= 0) {
       errorBanner.classList.remove('hidden');
-      playerFeeDisplay.textContent = '--';
+      triggerSpark(playerFeeDisplay, '--');
       playerFeeDisplay.className = 'ticker-price error-state';
 
-      totalCostDisplay.textContent = formatCurrency(totalCost);
-      totalRevenueDisplay.textContent = '--';
-      netProfitDisplay.textContent = '--';
+      triggerSpark(totalCostDisplay, formatCurrency(totalCost));
+      triggerSpark(totalRevenueDisplay, '--');
+      triggerSpark(netProfitDisplay, '--');
 
       profitRow.className = 'summary-row profit-highlight';
       return;
@@ -210,13 +241,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalRevenue = playerFee * payingPlayers;
     const netProfit = totalRevenue - totalCost;
 
-    // 7. Update UI with formatted values
-    playerFeeDisplay.textContent = formatCurrency(playerFee);
+    // 7. Update UI with spark animation
+    triggerSpark(playerFeeDisplay, formatCurrency(playerFee));
     playerFeeDisplay.className = 'ticker-price has-value';
 
-    totalCostDisplay.textContent = formatCurrency(totalCost);
-    totalRevenueDisplay.textContent = formatCurrency(totalRevenue);
-    netProfitDisplay.textContent = formatCurrency(netProfit);
+    triggerSpark(totalCostDisplay, formatCurrency(totalCost));
+    triggerSpark(totalRevenueDisplay, formatCurrency(totalRevenue));
+    triggerSpark(netProfitDisplay, formatCurrency(netProfit));
 
     // 8. Style profit highlighting row
     if (netProfit > 0.005) {
@@ -229,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 3. Picker Drawer System (Optimized with event delegation & passive scrolling)
+  // 3. Picker Drawer System (with CSS Stagger entry indexes)
   // ==========================================================================
   let activeHiddenInput = null;
   let activeDisplayEl = null;
@@ -244,19 +275,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const container = document.createElement('div');
     container.className = 'drawer-options-grid';
 
-    // Populate elements (with metadata parameters instead of inline listeners)
+    // Populate elements (inject stagger delays)
     for (let i = min; i <= max; i++) {
       const cell = document.createElement('div');
       cell.className = 'drawer-option-cell';
       cell.textContent = i;
       cell.setAttribute('data-value', i);
+      
+      // Cap the index delay to keep overall opening time under 300ms
+      const delayIndex = Math.min(i - min, 12);
+      cell.style.setProperty('--stagger-index', delayIndex);
+      
       if (i === currentVal) {
         cell.classList.add('selected');
       }
       container.appendChild(cell);
     }
 
-    // Event Delegation: single listener at container level reduces garbage collection & memory
+    // Event Delegation
     container.addEventListener('click', (e) => {
       const cell = e.target.closest('.drawer-option-cell');
       if (cell) {
@@ -293,36 +329,19 @@ document.addEventListener('DOMContentLoaded', () => {
     openDrawer("选择用球数量 (个)", 1, 24, current, shuttlesUsedInput, shuttlesDisplayVal);
   });
 
-  if (hostPickerTrigger) {
-    hostPickerTrigger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const current = parseInt(hostCountInput.value) || 0;
-      let next = 1;
-      if (current === 0) next = 1;
-      else if (current === 1) next = 2;
-      else if (current === 2) next = 0;
-      else next = 0;
-      hostCountInput.value = next;
-      if (hostDisplayVal) hostDisplayVal.textContent = next;
-      calculate();
-    });
-  }
-
-  // Direct Host Rates cards selection clicks (Event Delegation on grid for safety)
-  document.querySelectorAll('.host-rate-card').forEach(card => {
+  // Direct Host Rates cards selection clicks
+  hostRateCards.forEach(card => {
     card.addEventListener('click', () => {
       const hostVal = parseInt(card.getAttribute('data-host'));
       if (!isNaN(hostVal)) {
         hostCountInput.value = hostVal;
-        if (hostDisplayVal) hostDisplayVal.textContent = hostVal;
         calculate();
       }
     });
   });
 
   // ==========================================================================
-  // 4. Sliding/Clicking Segmented Control (Optimized: cached bounding boxes,
-  //    requestAnimationFrame throttling, and dynamic listeners to avoid reflows)
+  // 4. Sliding Segmented Control (Optimized dragging & layouts)
   // ==========================================================================
   let isDraggingCourt = false;
   let courtRect = null;
@@ -355,7 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateCourtFromCoords(dragClientX);
   }
 
-  // Global mousemove/touchmove callbacks (only active while dragging)
+  // Global move handlers
   function handleMouseMove(e) {
     dragClientX = e.clientX;
     if (!updateScheduled) {
@@ -391,14 +410,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.button !== 0) return;
     isDraggingCourt = true;
     courtSegmented.classList.add('dragging');
-    
-    // Caching layout bounding rect here prevents Forced Synchronous Layout in move handler!
     courtRect = courtSegmented.getBoundingClientRect();
-    
     dragClientX = e.clientX;
     updateCourtFromCoords(dragClientX);
     
-    // Dynamic binding avoids background overhead when not dragging
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   });
@@ -407,10 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
   courtSegmented.addEventListener('touchstart', (e) => {
     isDraggingCourt = true;
     courtSegmented.classList.add('dragging');
-    
-    // Caching layout bounding rect
     courtRect = courtSegmented.getBoundingClientRect();
-    
     dragClientX = e.touches[0].clientX;
     updateCourtFromCoords(dragClientX);
     
@@ -433,7 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Set event listeners for live calculations
+  // Event listeners for calculations
   startTimeSelect.addEventListener('change', calculate);
   durationSlider.addEventListener('input', calculate);
   durationSlider.addEventListener('change', calculate);
@@ -451,35 +463,187 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==========================================================================
-  // 5. Swipe Navigation Page System (Using hardware-accelerated translate3d)
+  // 5. Swipe Navigation Page System (Pointer Events 1:1, Rubberband & Velocity Handoff)
   // ==========================================================================
   const toggleViewBtn = document.getElementById('toggle-view-btn');
   const swipeViewport = document.querySelector('.swipe-viewport');
   const swipeTrack = document.getElementById('swipe-track');
   const indicatorDots = document.querySelectorAll('.indicator-dot');
+  
   let currentPage = 0;
+  let isDraggingSwipe = false;
+  let startDragX = 0;
+  let startOffsetPct = 0;
+  let viewportWidth = 0;
+  let velocityHistory = [];
 
-  function setPage(pageIndex) {
+  // Helper: Get matrix translateX percent
+  function getTranslateXPercent(el) {
+    const style = window.getComputedStyle(el);
+    const transform = style.transform;
+    if (!transform || transform === 'none') return 0;
+    
+    const matrix = new DOMMatrixReadOnly(transform);
+    const tx = matrix.m41; // translate X in pixels
+    const w = el.getBoundingClientRect().width;
+    if (w === 0) return 0;
+    return (tx / w) * 100;
+  }
+
+  // Physical Rubber-banding formula
+  function rubberband(overshoot, dimension, constant = 0.55) {
+    const sign = Math.sign(overshoot);
+    const absOvershoot = Math.abs(overshoot);
+    return sign * ((absOvershoot * dimension * constant) / (dimension + constant * absOvershoot));
+  }
+
+  // Snap track to page index with dynamic spring duration
+  function setPage(pageIndex, velocity = 0) {
     currentPage = pageIndex;
+    
+    // System level reduction check
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      const slides = document.querySelectorAll('.swipe-slide');
+      slides.forEach((slide, idx) => {
+        slide.classList.toggle('active-slide', idx === pageIndex);
+      });
+      indicatorDots.forEach((dot, idx) => {
+        dot.classList.toggle('active', idx === pageIndex);
+      });
+      return;
+    }
+    
+    let duration = 400; // ms default
+    viewportWidth = swipeViewport.getBoundingClientRect().width;
+    
+    if (Math.abs(velocity) > 0.1 && viewportWidth > 0) {
+      const targetPct = pageIndex === 0 ? 0 : -50;
+      const currentPct = getTranslateXPercent(swipeTrack);
+      
+      const distancePx = Math.abs(targetPct - currentPct) / 50 * viewportWidth;
+      duration = Math.max(180, Math.min(480, distancePx / Math.abs(velocity)));
+    }
+    
+    // Apply dynamic duration using spring curve
+    swipeTrack.style.transition = `transform ${duration}ms var(--ease-spring-approx)`;
+    
     if (pageIndex === 0) {
-      swipeTrack.style.transform = 'translate3d(0%, 0, 0)'; // GPU hardware layer translation
+      swipeTrack.style.transform = 'translate3d(0%, 0, 0)';
       toggleViewBtn.innerHTML = '<span class="btn-icon">📱</span><span class="btn-text">DuitNow-QR</span>';
       toggleViewBtn.classList.remove('active');
     } else {
-      swipeTrack.style.transform = 'translate3d(-50%, 0, 0)'; // GPU hardware layer translation
+      swipeTrack.style.transform = 'translate3d(-50%, 0, 0)';
       toggleViewBtn.innerHTML = '<span class="btn-icon">📊</span><span class="btn-text">Calculator</span>';
       toggleViewBtn.classList.add('active');
     }
 
-    // Update indicators
+    // Update indicator dots
     indicatorDots.forEach((dot, idx) => {
-      if (idx === pageIndex) {
-        dot.classList.add('active');
-      } else {
-        dot.classList.remove('active');
-      }
+      dot.classList.toggle('active', idx === pageIndex);
     });
   }
+
+  // pointer down gesture initialization
+  swipeViewport.addEventListener('pointerdown', (e) => {
+    // Escape gesture if target matches any sliders, selection cards, inputs, etc.
+    if (
+      e.target.closest('#duration-slider') ||
+      e.target.closest('.drawer-sheet') ||
+      e.target.closest('.picker-trigger') ||
+      e.target.closest('select') ||
+      e.target.closest('input') ||
+      e.target.closest('.segmented-control') ||
+      e.target.closest('.host-rate-card') ||
+      e.target.closest('.qr-image-wrapper') ||
+      e.target.closest('.qr-image') ||
+      e.button !== 0 // Left click/Touch only
+    ) {
+      return;
+    }
+    
+    isDraggingSwipe = true;
+    swipeTrack.classList.add('dragging');
+    startDragX = e.clientX;
+    viewportWidth = swipeViewport.getBoundingClientRect().width;
+    
+    startOffsetPct = getTranslateXPercent(swipeTrack);
+    velocityHistory = [{ x: e.clientX, time: performance.now() }];
+    
+    swipeViewport.setPointerCapture(e.pointerId);
+  });
+
+  // pointer tracking
+  swipeViewport.addEventListener('pointermove', (e) => {
+    if (!isDraggingSwipe) return;
+    
+    const deltaX = e.clientX - startDragX;
+    
+    // Map pixels to track percentage (track is 200% width, so 1 viewportWidth px = 50%)
+    let deltaPct = (deltaX / viewportWidth) * 50;
+    let targetPct = startOffsetPct + deltaPct;
+    
+    // Apply rubber-banding out of page boundaries
+    if (targetPct > 0) {
+      // Dragging past slide 0
+      const rubberPx = rubberband(deltaX, viewportWidth);
+      targetPct = (rubberPx / viewportWidth) * 50;
+    } else if (targetPct < -50) {
+      // Dragging past slide 1
+      const rubberPx = rubberband(deltaX, viewportWidth);
+      targetPct = -50 + (rubberPx / viewportWidth) * 50;
+    }
+    
+    swipeTrack.style.transform = `translate3d(${targetPct}%, 0, 0)`;
+    
+    velocityHistory.push({ x: e.clientX, time: performance.now() });
+    if (velocityHistory.length > 5) {
+      velocityHistory.shift();
+    }
+  });
+
+  // pointer release momentum handoff
+  swipeViewport.addEventListener('pointerup', (e) => {
+    if (!isDraggingSwipe) return;
+    isDraggingSwipe = false;
+    swipeTrack.classList.remove('dragging');
+    
+    let velocity = 0; // pixels per millisecond
+    if (velocityHistory.length >= 2) {
+      const first = velocityHistory[0];
+      const last = velocityHistory[velocityHistory.length - 1];
+      const dt = last.time - first.time;
+      if (dt > 0) {
+        velocity = (last.x - first.x) / dt;
+      }
+    }
+    
+    // Projected landing coordinate: current px location + velocity * 160ms momentum
+    const currentOffsetPct = getTranslateXPercent(swipeTrack);
+    const currentOffsetPx = (currentOffsetPct / 50) * viewportWidth;
+    const projectedPx = currentOffsetPx + velocity * 160;
+    
+    let targetPage = currentPage;
+    if (projectedPx > -viewportWidth / 2) {
+      targetPage = 0;
+    } else {
+      targetPage = 1;
+    }
+    
+    // Override snap page target if flick gesture has a high velocity
+    if (Math.abs(velocity) > 0.28) {
+      targetPage = velocity > 0 ? 0 : 1;
+    }
+    
+    setPage(targetPage, velocity);
+  });
+
+  swipeViewport.addEventListener('pointercancel', (e) => {
+    if (!isDraggingSwipe) return;
+    isDraggingSwipe = false;
+    swipeTrack.classList.remove('dragging');
+    setPage(currentPage);
+  });
 
   toggleViewBtn.addEventListener('click', () => {
     const nextPage = currentPage === 0 ? 1 : 0;
@@ -493,62 +657,123 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Touch swiping gestures (Passive events prevent blocking layout scrolling threads)
-  let startX = 0;
-  let currentX = 0;
-  let isSwiping = false;
-
-  swipeViewport.addEventListener('touchstart', (e) => {
-    // Avoid swiping if touching inputs, range sliders, or picker drawers
-    if (
-      e.target.closest('#duration-slider') ||
-      e.target.closest('.drawer-sheet') ||
-      e.target.closest('.picker-trigger') ||
-      e.target.closest('select') ||
-      e.target.closest('input')
-    ) {
-      isSwiping = false;
-      return;
-    }
-    startX = e.touches[0].clientX;
-    currentX = startX;
-    isSwiping = true;
-  }, { passive: true });
-
-  swipeViewport.addEventListener('touchmove', (e) => {
-    if (!isSwiping) return;
-    currentX = e.touches[0].clientX;
-  }, { passive: true });
-
-  swipeViewport.addEventListener('touchend', () => {
-    if (!isSwiping) return;
-    isSwiping = false;
-    const diffX = startX - currentX;
-    const swipeThreshold = 60; // minimum distance in px
-
-    if (Math.abs(diffX) > swipeThreshold) {
-      if (diffX > 0 && currentPage === 0) {
-        setPage(1); // Swipe left -> QR Code page
-      } else if (diffX < 0 && currentPage === 1) {
-        setPage(0); // Swipe right -> Calculator page
-      }
-    }
-  });
-
   // ==========================================================================
-  // 6. Fullscreen QR Zoom System (100% hardware-accelerated CSS visibility toggling)
+  // 6. Fullscreen QR Zoom System (Origin-Aware Morph transition)
   // ==========================================================================
   const qrImage = document.querySelector('.qr-image');
   const qrFullscreen = document.getElementById('qr-fullscreen');
 
   if (qrImage && qrFullscreen) {
     qrImage.addEventListener('click', () => {
+      // Bounding parameters of origin trigger
+      const triggerRect = qrImage.getBoundingClientRect();
+      const fsImage = qrFullscreen.querySelector('.qr-fullscreen-image');
+      
+      const tx = triggerRect.left + triggerRect.width / 2;
+      const ty = triggerRect.top + triggerRect.height / 2;
+      
+      // Center of the centered fullscreen image
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      
+      // Set dynamic transform-origin relative to centered element coordinate space
+      fsImage.style.transformOrigin = `calc(50% + ${tx - cx}px) calc(50% + ${ty - cy}px)`;
+      
+      // Force layout reflow to register starting scale state & origin before animation runs
+      void fsImage.offsetWidth;
+      
       qrFullscreen.classList.remove('hidden');
     });
 
     qrFullscreen.addEventListener('click', () => {
       qrFullscreen.classList.add('hidden');
     });
+  }
+
+  // Initialize page display classes for reduced motion fallback
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (prefersReducedMotion) {
+    const slides = document.querySelectorAll('.swipe-slide');
+    slides.forEach((slide, idx) => {
+      slide.classList.toggle('active-slide', idx === currentPage);
+    });
+  }
+
+  // ==========================================================================
+  // 7. Settings Popover & Theme Switching System
+  // ==========================================================================
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsDropdown = document.getElementById('settings-dropdown');
+  const themeOptBtns = document.querySelectorAll('.theme-opt-btn');
+
+  if (settingsBtn && settingsDropdown) {
+    // Toggle settings dropdown popover
+    settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = settingsDropdown.classList.toggle('hidden');
+      settingsBtn.classList.toggle('active', !isHidden);
+    });
+
+    // Prevent popover close on clicking dropdown contents
+    settingsDropdown.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    // Close settings dropdown on clicking anywhere else on page
+    document.addEventListener('click', () => {
+      settingsDropdown.classList.add('hidden');
+      settingsBtn.classList.remove('active');
+    });
+
+    // Theme application function
+    function applyTheme(mode) {
+      if (mode === 'system') {
+        const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (isSystemDark) {
+          document.documentElement.removeAttribute('data-theme');
+        } else {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      } else if (mode === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme'); // default is dark
+      }
+    }
+
+    // Toggle active state in popover buttons
+    function updateDropdownUI(mode) {
+      themeOptBtns.forEach(btn => {
+        const btnMode = btn.getAttribute('data-theme');
+        btn.classList.toggle('active', btnMode === mode);
+      });
+    }
+
+    // Select theme mode click bindings
+    themeOptBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.getAttribute('data-theme');
+        localStorage.setItem('theme-mode', mode);
+        applyTheme(mode);
+        updateDropdownUI(mode);
+        settingsDropdown.classList.add('hidden');
+        settingsBtn.classList.remove('active');
+      });
+    });
+
+    // Watch system color scheme changes
+    const systemMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    systemMediaQuery.addEventListener('change', () => {
+      const currentMode = localStorage.getItem('theme-mode') || 'system';
+      if (currentMode === 'system') {
+        applyTheme('system');
+      }
+    });
+
+    // Initialize theme mode
+    const initialMode = localStorage.getItem('theme-mode') || 'system';
+    updateDropdownUI(initialMode);
+    applyTheme(initialMode);
   }
 
   // Run initial calculation
