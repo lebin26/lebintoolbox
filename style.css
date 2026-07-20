@@ -19,6 +19,15 @@
   --color-text-primary: hsl(0, 0%, 98%);
   --color-text-muted: hsla(0, 0%, 98%, 0.5);
   --color-text-accent: hsl(250, 95%, 75%);   /* Premium Indigo accent */
+
+  /* Custom component theme support variables */
+  --color-slider-track: rgba(255, 255, 255, 0.08);
+  --color-bg-drawer-sheet: hsla(240, 20%, 8%, 0.75);
+  --color-bg-drawer-cell: rgba(255, 255, 255, 0.02);
+  --color-selected-option-text: #000000;
+  --drawer-sheet-shadow: 0 -16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --drawer-cell-selected-shadow: 0 0 14px rgba(255, 255, 255, 0.35);
+  --color-bg-settings-dropdown: hsla(240, 20%, 6%, 0.98);
   
   /* Bullish (Profit) and Bearish (Loss) colors */
   --color-bullish: hsl(142, 72%, 50%);       /* Vibrant Mint Emerald */
@@ -283,16 +292,19 @@ body {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 190px;
-  background: var(--color-bg-card-dark);
+  width: 240px;
+  background: var(--color-bg-settings-dropdown);
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), var(--glass-highlight);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), var(--glass-highlight);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  padding: 12px;
+  padding: 16px;
   z-index: 100;
   transform-origin: top right;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   will-change: transform, opacity;
   
   opacity: 1;
@@ -944,7 +956,7 @@ input[type="range"] {
 input[type="range"]::-webkit-slider-runnable-track {
   width: 100%;
   height: 6px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-slider-track);
   border-radius: 3px;
   cursor: pointer;
 }
@@ -952,7 +964,7 @@ input[type="range"]::-webkit-slider-runnable-track {
 input[type="range"]::-moz-range-track {
   width: 100%;
   height: 6px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-slider-track);
   border-radius: 3px;
   cursor: pointer;
 }
@@ -1207,14 +1219,14 @@ input[type="range"]::-moz-range-thumb:active {
 }
 
 .drawer-sheet {
-  background: hsla(240, 20%, 8%, 0.75);
+  background: var(--color-bg-drawer-sheet);
   border-top-left-radius: 24px;
   border-top-right-radius: 24px;
   border: 1px solid var(--color-border);
   border-bottom: none;
   width: 100%;
   max-width: 480px;
-  box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: var(--drawer-sheet-shadow);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   transform: translateY(100%);
@@ -1293,7 +1305,7 @@ input[type="range"]::-moz-range-thumb:active {
 }
 
 .drawer-option-cell {
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: var(--color-bg-drawer-cell);
   border: 1px solid var(--color-border);
   border-radius: 10px;
   color: var(--color-text-primary);
@@ -1341,8 +1353,8 @@ input[type="range"]::-moz-range-thumb:active {
 .drawer-option-cell.selected {
   background-color: var(--color-text-primary);
   border-color: var(--color-text-primary);
-  color: #000000;
-  box-shadow: 0 0 14px rgba(255, 255, 255, 0.35);
+  color: var(--color-selected-option-text);
+  box-shadow: var(--drawer-cell-selected-shadow);
   font-weight: 700;
 }
 
@@ -1663,6 +1675,15 @@ html[data-theme="light"] {
   
   --glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
   --glass-highlight: inset 0 1px 0px 0 rgba(255, 255, 255, 0.75), inset 0 -1px 0px 0 rgba(0, 0, 0, 0.04);
+
+  /* Light Theme overrides for custom components */
+  --color-slider-track: rgba(0, 0, 0, 0.08);
+  --color-bg-drawer-sheet: hsla(240, 20%, 98%, 0.85);
+  --color-bg-drawer-cell: rgba(0, 0, 0, 0.03);
+  --color-selected-option-text: #ffffff;
+  --drawer-sheet-shadow: 0 -16px 40px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --drawer-cell-selected-shadow: 0 0 14px rgba(0, 0, 0, 0.15);
+  --color-bg-settings-dropdown: hsla(240, 20%, 96%, 0.98);
 }
 
 /* Light Theme background & fluid blobs adaptations */
@@ -1708,4 +1729,154 @@ html[data-theme="light"] .qr-container {
   html[data-theme="light"] .qr-fullscreen-overlay {
     background-color: hsl(240, 20%, 96%) !important;
   }
+}
+
+/* ==========================================================================
+   OPTIMIZED CONTROLS & NEW FEATURE STYLES
+   ========================================================================== */
+
+/* Select inside settings dropdown */
+.settings-select-wrapper {
+  background-color: var(--color-bg-input);
+  border-radius: 8px;
+  width: 100%;
+}
+.settings-select-wrapper select {
+  padding: 8px 30px 8px 10px;
+  font-size: 0.85rem;
+  width: 100%;
+}
+.settings-select-wrapper .select-chevron {
+  right: 10px;
+  font-size: 0.65rem;
+}
+
+/* Rate inputs row */
+.settings-rate-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.settings-rate-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.settings-rate-input-group label {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+.settings-rate-input-group input {
+  background-color: var(--color-bg-input);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-numeric);
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 6px 8px;
+  width: 100%;
+  outline: none;
+  transition: border-color var(--transition-speed);
+}
+.settings-rate-input-group input:focus {
+  border-color: var(--color-border-focus);
+}
+
+/* Action button (QR upload/reset) inside settings */
+.qr-settings-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.settings-action-btn {
+  background-color: var(--color-bg-input);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-family: var(--font-family-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color var(--transition-speed), border-color var(--transition-speed), transform 120ms;
+}
+.settings-action-btn:active {
+  transform: scale(0.97);
+}
+@media (hover: hover) and (pointer: fine) {
+  .settings-action-btn:hover {
+    background-color: var(--color-bg-input-hover);
+    border-color: var(--color-border-glow);
+  }
+}
+
+/* Copy Bill Button */
+.copy-bill-btn {
+  width: 100%;
+  background: linear-gradient(135deg, hsl(250, 95%, 75%), hsl(270, 90%, 65%));
+  border: none;
+  border-radius: var(--border-radius);
+  color: #000000;
+  font-family: var(--font-family-sans);
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 8px 24px hsla(250, 95%, 75%, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: transform 150ms var(--ease-out-premium),
+              box-shadow var(--transition-speed) var(--ease-out-premium),
+              filter var(--transition-speed);
+  margin-top: 4px;
+}
+
+.copy-bill-btn:active {
+  transform: scale(0.96);
+  box-shadow: 0 4px 12px hsla(250, 95%, 75%, 0.25);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .copy-bill-btn:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 12px 28px hsla(250, 95%, 75%, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    transform: translateY(-1px);
+  }
+}
+
+/* Toast Notification */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: hsla(240, 15%, 10%, 0.85);
+  border: 1px solid var(--color-border-glow);
+  border-radius: var(--border-radius);
+  padding: 12px 20px;
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s var(--ease-out-premium),
+              transform 0.4s var(--ease-spring-approx);
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }

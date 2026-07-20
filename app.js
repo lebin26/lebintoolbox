@@ -12,6 +12,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const hostCountInput = document.getElementById('host-count');
   const additionalFeeInput = document.getElementById('additional-fee');
 
+  // Settings & Customization elements
+  const roundingSelect = document.getElementById('rounding-select');
+  const rateMorningInput = document.getElementById('rate-morning-input');
+  const rateEveningInput = document.getElementById('rate-evening-input');
+  const uploadQrBtn = document.getElementById('upload-qr-btn');
+  const resetQrBtn = document.getElementById('reset-qr-btn');
+  const qrFileInput = document.getElementById('qr-file-input');
+  const copyBillBtn = document.getElementById('copy-bill-btn');
+
+  // QR elements cached globally
+  const qrImage = document.querySelector('.qr-image');
+  const qrFullscreen = document.getElementById('qr-fullscreen');
+  const qrFullscreenImage = document.querySelector('.qr-fullscreen-image');
+
   // Trigger elements
   const durationTrigger = document.getElementById('duration-trigger');
   const durationDisplay = document.getElementById('duration-display');
@@ -62,9 +76,44 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('host-rate-2')
   ];
 
-  // Pricing constants
-  const RATE_MORNING = 14.84; // 12am - 6pm
-  const RATE_EVENING = 29.68; // 6pm - 12am
+  // Pricing constants (Loaded dynamically from localStorage, with defaults)
+  let rateMorning = parseFloat(localStorage.getItem('rate-morning')) || 14.84;
+  let rateEvening = parseFloat(localStorage.getItem('rate-evening')) || 29.68;
+  let roundingMode = localStorage.getItem('rounding-mode') || 'none';
+
+  // Default hardcoded bill copy template fallback
+  let billTemplate = '🏸 *Malend 羽毛球费用结算*\n' +
+    '📅 *时间*：{TIME_RANGE} ({DURATION} 小时)\n' +
+    '🏟️ *场地*：{COURT_COUNT} 片 × {DURATION} 小时 (RM {COURT_FEE})\n' +
+    '🏸 *用球*：{SHUTTLES_USED} 个 (RM {SHUTTLE_COST}，单价 RM {SHUTTLE_PRICE}/桶)\n' +
+    '👥 *人数*：{TOTAL_PLAYERS} 人 (含 {HOST_COUNT} Host，{PAYING_PLAYERS} 人付费)\n' +
+    '💰 *每人收费*：*{PLAYER_FEE}*{ROUNDING_DESC}\n' +
+    '{ADDITIONAL_FEE_LINE}-------------------------\n' +
+    '🧾 *总成本*：RM {TOTAL_COST}\n' +
+    '💵 *总收款*：{TOTAL_REVENUE}\n' +
+    '📈 *净利润*：{NET_PROFIT}\n\n' +
+    '📌 *付款请划到第二页扫 DuitNow QR 码，谢谢！*';
+
+  // Fetch custom template from text file on page load
+  fetch('bill_template.txt')
+    .then(response => {
+      if (response.ok) return response.text();
+      throw new Error('Template file not found or failed to load');
+    })
+    .then(text => {
+      if (text && text.trim()) {
+        billTemplate = text;
+        console.log('Successfully loaded custom bill template from bill_template.txt');
+      }
+    })
+    .catch(err => {
+      console.warn('Using default fallback template. Reason:', err.message);
+    });
+
+  // Initialize input fields in DOM
+  if (rateMorningInput) rateMorningInput.value = rateMorning.toFixed(2);
+  if (rateEveningInput) rateEveningInput.value = rateEvening.toFixed(2);
+  if (roundingSelect) roundingSelect.value = roundingMode;
 
   // Utility to format currency
   function formatCurrency(val) {
@@ -78,6 +127,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (h < 12) return `${h}:00 AM`;
     if (h === 12) return "12:00 PM";
     return `${h - 12}:00 PM`;
+  }
+
+  // Helper to apply selected rounding mode
+  function applyRounding(val, mode) {
+    if (mode === 'nearest-0.5') {
+      return Math.round(val * 2) / 2;
+    } else if (mode === 'ceil') {
+      return Math.ceil(val);
+    } else if (mode === 'floor') {
+      return Math.floor(val);
+    }
+    return val; // 'none'
   }
 
   // Toggle Duration Slider Panel
@@ -107,10 +168,10 @@ document.addEventListener('DOMContentLoaded', () => {
     for (let h = 0; h < duration; h++) {
       const hourOfDay = (startHour + h) % 24;
       if (hourOfDay >= 0 && hourOfDay < 18) {
-        totalFee += RATE_MORNING;
+        totalFee += rateMorning;
         hasMorning = true;
       } else {
-        totalFee += RATE_EVENING;
+        totalFee += rateEvening;
         hasEvening = true;
       }
     }
@@ -203,7 +264,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (displayEl && cardEl) {
         let feeStr = '--';
         if (paying > 0) {
-          const fee = (totalCost / paying) + additionalFee;
+          const exactFee = (totalCost / paying) + additionalFee;
+          const fee = applyRounding(exactFee, roundingMode);
           feeStr = formatCurrency(fee);
         }
         triggerSpark(displayEl, feeStr);
@@ -236,10 +298,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     errorBanner.classList.add('hidden');
 
-    // 6. Run calculations
-    const playerFee = (totalCost / payingPlayers) + additionalFee;
+    // 6. Run calculations with rounding
+    const exactPlayerFee = (totalCost / payingPlayers) + additionalFee;
+    const playerFee = applyRounding(exactPlayerFee, roundingMode);
     const totalRevenue = playerFee * payingPlayers;
-    const netProfit = totalRevenue - totalCost;
+    let netProfit = totalRevenue - totalCost;
+    if (Math.abs(netProfit) < 0.005) {
+      netProfit = 0;
+    }
 
     // 7. Update UI with spark animation
     triggerSpark(playerFeeDisplay, formatCurrency(playerFee));
@@ -660,8 +726,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================================================
   // 6. Fullscreen QR Zoom System (Origin-Aware Morph transition)
   // ==========================================================================
-  const qrImage = document.querySelector('.qr-image');
-  const qrFullscreen = document.getElementById('qr-fullscreen');
 
   if (qrImage && qrFullscreen) {
     qrImage.addEventListener('click', () => {
@@ -775,6 +839,252 @@ document.addEventListener('DOMContentLoaded', () => {
     updateDropdownUI(initialMode);
     applyTheme(initialMode);
   }
+
+  // ==========================================================================
+  // 8. Custom QR Code Upload & LocalStorage Persistence
+  // ==========================================================================
+
+  function updateQRImages(src) {
+    if (qrImage) qrImage.src = src;
+    if (qrFullscreenImage) qrFullscreenImage.src = src;
+    
+    if (src.startsWith('data:image')) {
+      resetQrBtn.classList.remove('hidden');
+    } else {
+      resetQrBtn.classList.add('hidden');
+    }
+  }
+
+  // Load custom QR on start
+  const customQr = localStorage.getItem('custom-qr');
+  if (customQr) {
+    updateQRImages(customQr);
+  } else {
+    updateQRImages('assets/duitnow-qr.png');
+  }
+
+  // Bind upload events
+  if (uploadQrBtn && qrFileInput) {
+    uploadQrBtn.addEventListener('click', () => {
+      qrFileInput.click();
+    });
+    
+    qrFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const base64 = evt.target.result;
+          localStorage.setItem('custom-qr', base64);
+          updateQRImages(base64);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  if (resetQrBtn) {
+    resetQrBtn.addEventListener('click', () => {
+      localStorage.removeItem('custom-qr');
+      updateQRImages('assets/duitnow-qr.png');
+      if (qrFileInput) qrFileInput.value = '';
+    });
+  }
+
+  // ==========================================================================
+  // 9. Config Event Listeners (Rounding & Custom Rates)
+  // ==========================================================================
+  if (roundingSelect) {
+    roundingSelect.addEventListener('change', () => {
+      roundingMode = roundingSelect.value;
+      localStorage.setItem('rounding-mode', roundingMode);
+      calculate();
+    });
+  }
+
+  if (rateMorningInput) {
+    rateMorningInput.addEventListener('change', () => {
+      const val = parseFloat(rateMorningInput.value);
+      if (!isNaN(val) && val >= 0) {
+        rateMorning = val;
+        localStorage.setItem('rate-morning', val);
+        calculate();
+      }
+    });
+  }
+
+  if (rateEveningInput) {
+    rateEveningInput.addEventListener('change', () => {
+      const val = parseFloat(rateEveningInput.value);
+      if (!isNaN(val) && val >= 0) {
+        rateEvening = val;
+        localStorage.setItem('rate-evening', val);
+        calculate();
+      }
+    });
+  }
+
+  // ==========================================================================
+  // 10. Copy Bill Summary Functionality
+  // ==========================================================================
+  function showToast(message) {
+    let toast = document.getElementById('copy-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'copy-toast';
+      toast.className = 'toast';
+      document.body.appendChild(toast);
+    }
+    toast.innerHTML = `<span class="toast-icon">✨</span><span class="toast-msg">${message}</span>`;
+    toast.classList.add('show');
+    setTimeout(() => {
+      toast.classList.remove('show');
+    }, 2000);
+  }
+
+  function fallbackCopyText(text) {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    // Position off-screen to avoid visual jump, keep it in DOM and displayable so Safari allows focus
+    textArea.style.position = "absolute";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "0";
+    textArea.style.width = "2em";
+    textArea.style.height = "2em";
+    textArea.style.padding = "0";
+    textArea.style.border = "none";
+    textArea.style.outline = "none";
+    textArea.style.boxShadow = "none";
+    textArea.style.background = "transparent";
+    document.body.appendChild(textArea);
+    
+    // Select text (handles both PC and iOS Safari selection ranges)
+    textArea.focus();
+    textArea.select();
+    textArea.setSelectionRange(0, 99999);
+    
+    try {
+      const successful = document.execCommand('copy');
+      if (successful) {
+        showToast("账单已成功复制到剪贴板！");
+      } else {
+        alert("复制失败，请手动选择复制。");
+      }
+    } catch (err) {
+      console.error('Fallback copy failed: ', err);
+      alert("复制失败，请手动选择复制。");
+    }
+    document.body.removeChild(textArea);
+  }
+
+  if (copyBillBtn) {
+    copyBillBtn.addEventListener('click', () => {
+      const startHour = parseInt(startTimeSelect.value);
+      const duration = parseInt(durationSlider.value);
+      const endHour = startHour + duration;
+      const startStr = format12Hour(startHour);
+      const endStr = format12Hour(endHour);
+
+      let courtCount = 0;
+      for (let i = 0; i < courtRadios.length; i++) {
+        if (courtRadios[i].checked) {
+          courtCount = parseInt(courtRadios[i].value);
+          break;
+        }
+      }
+
+      const shuttlesUsed = parseInt(shuttlesUsedInput.value) || 0;
+      const shuttlePrice = parseFloat(shuttlePriceInput.value) || 0;
+      const shuttleCost = (shuttlesUsed * shuttlePrice) / 12;
+
+      const { fee: baseCourtFee } = calculateCourtFee(startHour, duration);
+      const courtFee = baseCourtFee * courtCount;
+
+      const totalPlayers = parseInt(totalPlayersInput.value) || 0;
+      const hostCount = parseInt(hostCountInput.value) || 0;
+      const payingPlayers = totalPlayers - hostCount;
+      const additionalFee = parseFloat(additionalFeeInput.value) || 0;
+      const totalCost = courtFee + shuttleCost;
+
+      let playerFeeStr = '--';
+      let revenueStr = '--';
+      let profitStr = '--';
+
+      if (payingPlayers > 0) {
+        const exactPlayerFee = (totalCost / payingPlayers) + additionalFee;
+        const playerFee = applyRounding(exactPlayerFee, roundingMode);
+        playerFeeStr = `RM ${formatCurrency(playerFee)}`;
+        revenueStr = `RM ${formatCurrency(playerFee * payingPlayers)}`;
+        
+        let netProfit = (playerFee * payingPlayers) - totalCost;
+        if (Math.abs(netProfit) < 0.005) {
+          netProfit = 0;
+        }
+        
+        if (netProfit < 0) {
+          profitStr = `-RM ${formatCurrency(Math.abs(netProfit))}`;
+        } else {
+          profitStr = `RM ${formatCurrency(netProfit)}`;
+        }
+      }
+
+      let roundingDesc = "";
+      if (roundingMode === 'nearest-0.5') roundingDesc = " (舍入至0.5)";
+      else if (roundingMode === 'ceil') roundingDesc = " (向上取整)";
+      else if (roundingMode === 'floor') roundingDesc = " (向下取整)";
+
+      const timeRangeStr = `${startStr} - ${endStr}`;
+      const additionalFeeLine = additionalFee > 0 ? `➕ *附加费*：RM ${additionalFee.toFixed(2)} /人\n` : '';
+
+      // Replace placeholders in template dynamically
+      const billText = billTemplate
+        .replace(/{TIME_RANGE}/g, timeRangeStr)
+        .replace(/{DURATION}/g, duration.toString())
+        .replace(/{COURT_COUNT}/g, courtCount.toString())
+        .replace(/{COURT_FEE}/g, courtFee.toFixed(2))
+        .replace(/{SHUTTLES_USED}/g, shuttlesUsed.toString())
+        .replace(/{SHUTTLE_COST}/g, shuttleCost.toFixed(2))
+        .replace(/{SHUTTLE_PRICE}/g, shuttlePrice.toFixed(2))
+        .replace(/{TOTAL_PLAYERS}/g, totalPlayers.toString())
+        .replace(/{HOST_COUNT}/g, hostCount.toString())
+        .replace(/{PAYING_PLAYERS}/g, payingPlayers.toString())
+        .replace(/{PLAYER_FEE}/g, playerFeeStr)
+        .replace(/{ROUNDING_DESC}/g, roundingDesc)
+        .replace(/{ADDITIONAL_FEE_LINE}/g, additionalFeeLine)
+        .replace(/{ADDITIONAL_FEE}/g, additionalFee.toFixed(2))
+        .replace(/{TOTAL_COST}/g, totalCost.toFixed(2))
+        .replace(/{TOTAL_REVENUE}/g, revenueStr)
+        .replace(/{NET_PROFIT}/g, profitStr);
+
+      // Robust copy to clipboard (handles security constraints in Safari/HTTP/sandboxes)
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(billText).then(() => {
+            showToast("账单已成功复制到剪贴板！");
+          }).catch(err => {
+            console.error('Failed to copy with navigator.clipboard: ', err);
+            fallbackCopyText(billText);
+          });
+        } else {
+          fallbackCopyText(billText);
+        }
+      } catch (err) {
+        console.error('Synchronous copy error: ', err);
+        fallbackCopyText(billText);
+      }
+    });
+  }
+
+  // ==========================================================================
+  // 11. Focus Selection UX Enhancements
+  // ==========================================================================
+  [shuttlePriceInput, additionalFeeInput, rateMorningInput, rateEveningInput].forEach(input => {
+    if (input) {
+      input.addEventListener('focus', (e) => {
+        e.target.select();
+      });
+    }
+  });
 
   // Run initial calculation
   calculate();
