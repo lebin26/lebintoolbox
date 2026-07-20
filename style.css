@@ -85,6 +85,8 @@ body {
   mix-blend-mode: screen;
   animation: float-around 25s infinite alternate ease-in-out;
   pointer-events: none;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
 }
 
 .blob-1 {
@@ -118,20 +120,16 @@ body {
 
 @keyframes float-around {
   0% {
-    transform: translate(0, 0) scale(1) rotate(0deg);
-    border-radius: 40% 60% 60% 40% / 40% 40% 60% 60%;
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
   }
   33% {
-    transform: translate(12vw, 8vh) scale(1.15) rotate(120deg);
-    border-radius: 55% 45% 35% 65% / 55% 55% 45% 45%;
+    transform: translate3d(12vw, 8vh, 0) scale(1.15) rotate(120deg);
   }
   66% {
-    transform: translate(-6vw, 16vh) scale(0.9) rotate(240deg);
-    border-radius: 65% 35% 50% 50% / 35% 55% 45% 65%;
+    transform: translate3d(-6vw, 16vh, 0) scale(0.9) rotate(240deg);
   }
   100% {
-    transform: translate(0, 0) scale(1) rotate(360deg);
-    border-radius: 40% 60% 60% 40% / 40% 40% 60% 60%;
+    transform: translate3d(0, 0, 0) scale(1) rotate(360deg);
   }
 }
 
@@ -157,6 +155,7 @@ body {
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--glass-shadow), var(--glass-highlight);
+  transform: translate3d(0, 0, 0);
 }
 
 .tv-logo-area {
@@ -220,6 +219,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  transform: translate3d(0, 0, 0);
 }
 
 /* Ticker Section (每人收费 Display) */
@@ -286,7 +286,9 @@ body {
   display: flex;
   width: 200%;
   transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
-  transform: translateX(0);
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .swipe-slide {
@@ -525,6 +527,8 @@ body {
   z-index: 0;
   pointer-events: none;
   opacity: 0;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 /* Stretch the thumb when dragging */
@@ -1006,12 +1010,13 @@ input[type="range"]::-moz-range-thumb:active {
   justify-content: center;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  transition: opacity 0.25s ease;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
 }
 
 .drawer-overlay.hidden {
   opacity: 0;
   pointer-events: none;
+  visibility: hidden;
 }
 
 .drawer-sheet {
@@ -1027,6 +1032,8 @@ input[type="range"]::-moz-range-thumb:active {
   -webkit-backdrop-filter: var(--glass-blur);
   transform: translateY(100%);
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .drawer-overlay:not(.hidden) .drawer-sheet {
@@ -1205,17 +1212,19 @@ input[type="range"]::-moz-range-thumb:active {
   justify-content: center;
   align-items: center;
   cursor: zoom-out;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s ease;
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
   backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
   padding: 20px;
 }
 
-.qr-fullscreen-overlay.active {
-  opacity: 1;
-  pointer-events: auto;
+.qr-fullscreen-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
 }
 
 .qr-fullscreen-image {
@@ -1227,11 +1236,12 @@ input[type="range"]::-moz-range-thumb:active {
   padding: 20px;
   object-fit: contain;
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  transform: scale(0.9);
+  transform: scale(1);
+  will-change: transform;
 }
 
-.qr-fullscreen-overlay.active .qr-fullscreen-image {
-  transform: scale(1);
+.qr-fullscreen-overlay.hidden .qr-fullscreen-image {
+  transform: scale(0.9);
 }
 
 .qr-fullscreen-tip {

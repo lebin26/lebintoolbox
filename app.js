@@ -1,4 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // ==========================================================================
+  // 1. DOM Element Cache (Cached once on load to avoid repetitive queries)
+  // ==========================================================================
+  
   // Input elements (Dropdowns, Hidden, and Standard inputs)
   const startTimeSelect = document.getElementById('start-time-select');
   const durationSlider = document.getElementById('duration-slider');
@@ -39,6 +43,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const drawerTitle = document.getElementById('drawer-title');
   const drawerBody = document.getElementById('drawer-body');
   const drawerCloseBtn = document.getElementById('drawer-close');
+
+  // Court segmented elements
+  const courtSegmented = document.getElementById('court-segmented-control');
+  const courtRadios = document.querySelectorAll('input[name="court-count"]');
+  const courtRadiosMap = {
+    1: document.getElementById('court-1'),
+    2: document.getElementById('court-2'),
+    3: document.getElementById('court-3')
+  };
+
+  // Host Rates Comparison cards
+  const hostRateDisplays = [
+    document.getElementById('host-rate-0-display'),
+    document.getElementById('host-rate-1-display'),
+    document.getElementById('host-rate-2-display')
+  ];
+  const hostRateCards = [
+    document.getElementById('host-rate-0'),
+    document.getElementById('host-rate-1'),
+    document.getElementById('host-rate-2')
+  ];
 
   // Pricing constants
   const RATE_MORNING = 14.84; // 12am - 6pm
@@ -99,7 +124,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // Main Calculation Loop
+  // ==========================================================================
+  // 2. Main Calculation Loop (Optimized to use cached elements)
+  // ==========================================================================
   function calculate() {
     // 1. Gather input parameters
     const startHour = parseInt(startTimeSelect.value);
@@ -118,10 +145,15 @@ document.addEventListener('DOMContentLoaded', () => {
     durationDisplay.textContent = `${duration} 小时`;
     sliderValBubble.textContent = `${duration} 小时`;
 
-    // 3. Compute dynamic court fee
+    // 3. Compute dynamic court fee (Optimized read via loop instead of querySelector)
+    let courtCount = 0;
+    for (let i = 0; i < courtRadios.length; i++) {
+      if (courtRadios[i].checked) {
+        courtCount = parseInt(courtRadios[i].value);
+        break;
+      }
+    }
     const { fee: baseCourtFee, breakdown } = calculateCourtFee(startHour, duration);
-    const courtCountRadio = document.querySelector('input[name="court-count"]:checked');
-    const courtCount = courtCountRadio ? parseInt(courtCountRadio.value) : 0;
     const courtFee = baseCourtFee * courtCount;
 
     courtFeeInput.value = formatCurrency(courtFee);
@@ -134,8 +166,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Calculate bottom reference comparison cards (0 to 2 Hosts)
     for (let h = 0; h <= 2; h++) {
       const paying = totalPlayers - h;
-      const displayEl = document.getElementById(`host-rate-${h}-display`);
-      const cardEl = document.getElementById(`host-rate-${h}`);
+      const displayEl = hostRateDisplays[h];
+      const cardEl = hostRateCards[h];
 
       if (displayEl && cardEl) {
         if (paying <= 0) {
@@ -196,7 +228,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // --- Dynamic Option Picker Drawer System ---
+  // ==========================================================================
+  // 3. Picker Drawer System (Optimized with event delegation & passive scrolling)
+  // ==========================================================================
   let activeHiddenInput = null;
   let activeDisplayEl = null;
 
@@ -210,26 +244,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const container = document.createElement('div');
     container.className = 'drawer-options-grid';
 
+    // Populate elements (with metadata parameters instead of inline listeners)
     for (let i = min; i <= max; i++) {
       const cell = document.createElement('div');
       cell.className = 'drawer-option-cell';
       cell.textContent = i;
+      cell.setAttribute('data-value', i);
       if (i === currentVal) {
         cell.classList.add('selected');
       }
-
-      cell.addEventListener('click', () => {
-        // Update value
-        activeHiddenInput.value = i;
-        activeDisplayEl.textContent = i;
-
-        // Recalculate and Close
-        calculate();
-        closeDrawer();
-      });
-
       container.appendChild(cell);
     }
+
+    // Event Delegation: single listener at container level reduces garbage collection & memory
+    container.addEventListener('click', (e) => {
+      const cell = e.target.closest('.drawer-option-cell');
+      if (cell) {
+        const val = parseInt(cell.getAttribute('data-value'));
+        if (!isNaN(val)) {
+          activeHiddenInput.value = val;
+          activeDisplayEl.textContent = val;
+          calculate();
+          closeDrawer();
+        }
+      }
+    });
 
     drawerBody.appendChild(container);
     drawerOverlay.classList.remove('hidden');
@@ -269,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Direct Host Rates cards selection clicks
+  // Direct Host Rates cards selection clicks (Event Delegation on grid for safety)
   document.querySelectorAll('.host-rate-card').forEach(card => {
     card.addEventListener('click', () => {
       const hostVal = parseInt(card.getAttribute('data-host'));
@@ -281,16 +320,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // --- Sliding and Clicking for Court Count Control ---
-  const courtSegmented = document.getElementById('court-segmented-control');
-  const courtRadios = document.querySelectorAll('input[name="court-count"]');
+  // ==========================================================================
+  // 4. Sliding/Clicking Segmented Control (Optimized: cached bounding boxes,
+  //    requestAnimationFrame throttling, and dynamic listeners to avoid reflows)
+  // ==========================================================================
   let isDraggingCourt = false;
-  let selectedRadio = document.querySelector('input[name="court-count"]:checked');
+  let courtRect = null;
+  let dragClientX = 0;
+  let updateScheduled = false;
 
   function updateCourtFromCoords(clientX) {
-    const rect = courtSegmented.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const percentage = x / rect.width;
+    if (!courtRect || courtRect.width === 0) return;
+    const x = clientX - courtRect.left;
+    const percentage = x / courtRect.width;
     let value = 1;
     if (percentage < 0.33) {
       value = 1;
@@ -300,51 +342,81 @@ document.addEventListener('DOMContentLoaded', () => {
       value = 3;
     }
 
-    const targetRadio = document.getElementById(`court-${value}`);
+    const targetRadio = courtRadiosMap[value];
     if (targetRadio && !targetRadio.checked) {
       targetRadio.checked = true;
       targetRadio.dispatchEvent(new Event('change'));
     }
   }
 
+  // requestAnimationFrame batch callback
+  function onDragUpdate() {
+    updateScheduled = false;
+    updateCourtFromCoords(dragClientX);
+  }
+
+  // Global mousemove/touchmove callbacks (only active while dragging)
+  function handleMouseMove(e) {
+    dragClientX = e.clientX;
+    if (!updateScheduled) {
+      updateScheduled = true;
+      requestAnimationFrame(onDragUpdate);
+    }
+  }
+
+  function handleMouseUp() {
+    isDraggingCourt = false;
+    courtSegmented.classList.remove('dragging');
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  }
+
+  function handleTouchMove(e) {
+    dragClientX = e.touches[0].clientX;
+    if (!updateScheduled) {
+      updateScheduled = true;
+      requestAnimationFrame(onDragUpdate);
+    }
+  }
+
+  function handleTouchEnd() {
+    isDraggingCourt = false;
+    courtSegmented.classList.remove('dragging');
+    document.removeEventListener('touchmove', handleTouchMove);
+    document.removeEventListener('touchend', handleTouchEnd);
+  }
+
+  // Mouse drag initializer
   courtSegmented.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
     isDraggingCourt = true;
     courtSegmented.classList.add('dragging');
-    updateCourtFromCoords(e.clientX);
+    
+    // Caching layout bounding rect here prevents Forced Synchronous Layout in move handler!
+    courtRect = courtSegmented.getBoundingClientRect();
+    
+    dragClientX = e.clientX;
+    updateCourtFromCoords(dragClientX);
+    
+    // Dynamic binding avoids background overhead when not dragging
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   });
 
-  document.addEventListener('mousemove', (e) => {
-    if (isDraggingCourt) {
-      updateCourtFromCoords(e.clientX);
-    }
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (isDraggingCourt) {
-      isDraggingCourt = false;
-      courtSegmented.classList.remove('dragging');
-    }
-  });
-
+  // Touch drag initializer
   courtSegmented.addEventListener('touchstart', (e) => {
     isDraggingCourt = true;
     courtSegmented.classList.add('dragging');
-    updateCourtFromCoords(e.touches[0].clientX);
+    
+    // Caching layout bounding rect
+    courtRect = courtSegmented.getBoundingClientRect();
+    
+    dragClientX = e.touches[0].clientX;
+    updateCourtFromCoords(dragClientX);
+    
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd);
   }, { passive: true });
-
-  courtSegmented.addEventListener('touchmove', (e) => {
-    if (isDraggingCourt) {
-      updateCourtFromCoords(e.touches[0].clientX);
-    }
-  }, { passive: true });
-
-  courtSegmented.addEventListener('touchend', () => {
-    if (isDraggingCourt) {
-      isDraggingCourt = false;
-      courtSegmented.classList.remove('dragging');
-    }
-  });
 
   // Track selected court count radio changes
   courtRadios.forEach(radio => {
@@ -378,7 +450,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // --- Swipe Navigation Page System (Calc vs QR Code) ---
+  // ==========================================================================
+  // 5. Swipe Navigation Page System (Using hardware-accelerated translate3d)
+  // ==========================================================================
   const toggleViewBtn = document.getElementById('toggle-view-btn');
   const swipeViewport = document.querySelector('.swipe-viewport');
   const swipeTrack = document.getElementById('swipe-track');
@@ -388,11 +462,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function setPage(pageIndex) {
     currentPage = pageIndex;
     if (pageIndex === 0) {
-      swipeTrack.style.transform = 'translateX(0%)';
+      swipeTrack.style.transform = 'translate3d(0%, 0, 0)'; // GPU hardware layer translation
       toggleViewBtn.innerHTML = '<span class="btn-icon">📱</span><span class="btn-text">DuitNow-QR</span>';
       toggleViewBtn.classList.remove('active');
     } else {
-      swipeTrack.style.transform = 'translateX(-50%)';
+      swipeTrack.style.transform = 'translate3d(-50%, 0, 0)'; // GPU hardware layer translation
       toggleViewBtn.innerHTML = '<span class="btn-icon">📊</span><span class="btn-text">Calculator</span>';
       toggleViewBtn.classList.add('active');
     }
@@ -419,7 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Touch swiping gestures
+  // Touch swiping gestures (Passive events prevent blocking layout scrolling threads)
   let startX = 0;
   let currentX = 0;
   let isSwiping = false;
@@ -461,25 +535,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // --- Fullscreen QR Zoom System ---
+  // ==========================================================================
+  // 6. Fullscreen QR Zoom System (100% hardware-accelerated CSS visibility toggling)
+  // ==========================================================================
   const qrImage = document.querySelector('.qr-image');
   const qrFullscreen = document.getElementById('qr-fullscreen');
 
   if (qrImage && qrFullscreen) {
     qrImage.addEventListener('click', () => {
       qrFullscreen.classList.remove('hidden');
-      // Let the browser paint the display: flex layout before animating opacity/scale
-      setTimeout(() => {
-        qrFullscreen.classList.add('active');
-      }, 10);
     });
 
     qrFullscreen.addEventListener('click', () => {
-      qrFullscreen.classList.remove('active');
-      // Wait for opacity transition to complete before setting display: none
-      setTimeout(() => {
-        qrFullscreen.classList.add('hidden');
-      }, 220); // 220ms matches the CSS transition length
+      qrFullscreen.classList.add('hidden');
     });
   }
 
