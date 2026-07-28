@@ -375,6 +375,14 @@ document.addEventListener('DOMContentLoaded', () => {
     drawerBody.appendChild(container);
     drawerOverlay.classList.remove('hidden');
     document.body.style.overflow = 'hidden'; // Prevent background scrolling
+
+    // Trigger staggered entry animation (replaces @starting-style for WebKit compat)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const cells = container.querySelectorAll('.drawer-option-cell');
+        cells.forEach(cell => cell.classList.add('animate-in'));
+      });
+    });
   }
 
   function closeDrawer() {
@@ -728,10 +736,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================================================
 
   if (qrImage && qrFullscreen) {
+    const fsImage = qrFullscreen.querySelector('.qr-fullscreen-image');
+
     qrImage.addEventListener('click', () => {
       // Bounding parameters of origin trigger
       const triggerRect = qrImage.getBoundingClientRect();
-      const fsImage = qrFullscreen.querySelector('.qr-fullscreen-image');
       
       const tx = triggerRect.left + triggerRect.width / 2;
       const ty = triggerRect.top + triggerRect.height / 2;
@@ -743,13 +752,24 @@ document.addEventListener('DOMContentLoaded', () => {
       // Set dynamic transform-origin relative to centered element coordinate space
       fsImage.style.transformOrigin = `calc(50% + ${tx - cx}px) calc(50% + ${ty - cy}px)`;
       
+      // Ensure starting scale is applied before showing
+      fsImage.classList.remove('qr-animate-in');
+      
       // Force layout reflow to register starting scale state & origin before animation runs
       void fsImage.offsetWidth;
       
       qrFullscreen.classList.remove('hidden');
+      
+      // Trigger entry animation (replaces @starting-style for WebKit compat)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          fsImage.classList.add('qr-animate-in');
+        });
+      });
     });
 
     qrFullscreen.addEventListener('click', () => {
+      fsImage.classList.remove('qr-animate-in');
       qrFullscreen.classList.add('hidden');
     });
   }
