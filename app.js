@@ -740,7 +740,7 @@ document.addEventListener('DOMContentLoaded', () => {
       toggleViewBtn.classList.remove('active');
     } else {
       swipeTrack.style.transform = 'translate3d(-50%, 0, 0)';
-      toggleViewBtn.innerHTML = '<span class="btn-icon">📊</span><span class="btn-text">Calculator</span>';
+      toggleViewBtn.innerHTML = '<span class="btn-icon">📊</span><span class="btn-text">CourtLedger</span>';
       toggleViewBtn.classList.add('active');
     }
 
