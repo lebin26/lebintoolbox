@@ -10,15 +10,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const shuttlePriceInput = document.getElementById('shuttle-price');
   const totalPlayersInput = document.getElementById('total-players');
   const hostCountInput = document.getElementById('host-count');
-  const additionalFeeInput = document.getElementById('additional-fee');
+  
+  // Stepper elements for Additional Shuttles (+球数)
+  const addShuttlesMinusBtn = document.getElementById('add-shuttles-minus');
+  const addShuttlesPlusBtn = document.getElementById('add-shuttles-plus');
+  const addShuttlesDisplay = document.getElementById('add-shuttles-display');
+  const additionalShuttlesInput = document.getElementById('additional-shuttles');
+
+  // Shuttle Summary Statistics elements (最下方的用球统计)
+  const sumActualShuttles = document.getElementById('sum-actual-shuttles');
+  const sumCoverShuttles = document.getElementById('sum-cover-shuttles');
+  const sumProfitShuttles = document.getElementById('sum-profit-shuttles');
+  const sumBilledShuttles = document.getElementById('sum-billed-shuttles');
 
   // Settings & Customization elements
   const roundingSelect = document.getElementById('rounding-select');
   const rateMorningInput = document.getElementById('rate-morning-input');
   const rateEveningInput = document.getElementById('rate-evening-input');
-  const uploadQrBtn = document.getElementById('upload-qr-btn');
-  const resetQrBtn = document.getElementById('reset-qr-btn');
-  const qrFileInput = document.getElementById('qr-file-input');
   const copyBillBtn = document.getElementById('copy-bill-btn');
 
   // QR elements cached globally
@@ -64,17 +72,12 @@ document.addEventListener('DOMContentLoaded', () => {
     3: document.getElementById('court-3')
   };
 
-  // Host Rates Comparison cards
-  const hostRateDisplays = [
-    document.getElementById('host-rate-0-display'),
-    document.getElementById('host-rate-1-display'),
-    document.getElementById('host-rate-2-display')
-  ];
-  const hostRateCards = [
-    document.getElementById('host-rate-0'),
-    document.getElementById('host-rate-1'),
-    document.getElementById('host-rate-2')
-  ];
+  // Host Segmented buttons
+  const hostOptBtns = document.querySelectorAll('.host-opt-btn');
+
+  // Shuttle status tags
+  const shuttleInfoTag = document.getElementById('shuttle-info-tag');
+  const profitShuttlesTag = document.getElementById('profit-shuttles-tag');
 
   // Pricing constants (Loaded dynamically from localStorage, with defaults)
   let rateMorning = parseFloat(localStorage.getItem('rate-morning')) || 14.84;
@@ -194,6 +197,106 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Helper to calculate required host shuttles (for statistics display only)
+  function calculateRequiredHostShuttles(courtFee, shuttlesUsed, shuttlePrice, totalPlayers, hostCount, roundingMode) {
+    if (hostCount <= 0 || totalPlayers <= hostCount || shuttlePrice <= 0) {
+      return 0;
+    }
+    const singleShuttlePrice = shuttlePrice / 12;
+    const actualShuttleCost = shuttlesUsed * singleShuttlePrice;
+    const actualTotalCost = courtFee + actualShuttleCost;
+    const payingPlayers = totalPlayers - hostCount;
+
+    let k = 0;
+    while (k <= 100) {
+      const billedShuttles = shuttlesUsed + k;
+      const billedTotalCost = courtFee + (billedShuttles * singleShuttlePrice);
+      const unroundedFee = billedTotalCost / totalPlayers;
+      const playerFee = applyRounding(unroundedFee, roundingMode);
+      const totalRevenue = playerFee * payingPlayers;
+
+      if (totalRevenue >= actualTotalCost - 0.0001) {
+        return k;
+      }
+      k++;
+    }
+    return 0;
+  }
+
+  // Helper to compute fee and cost breakdown based on the 3-item shuttle concept:
+  // Item 1: shuttlesUsed (真实用球)
+  // Item 2: requiredHostShuttles (覆盖Host需补球数，仅作统计参考)
+  // Item 3: profitShuttles (额外盈利球数，超过requiredHostShuttles的部分才计数)
+  function computeFeeAndBreakdown(courtFee, shuttlesUsed, shuttlePrice, totalPlayers, hostCount, additionalShuttles, roundingMode) {
+    const singleShuttlePrice = shuttlePrice > 0 ? (shuttlePrice / 12) : 0;
+    const actualShuttleCost = shuttlesUsed * singleShuttlePrice;
+    const actualTotalCost = courtFee + actualShuttleCost;
+    const billedShuttles = shuttlesUsed + additionalShuttles;
+    const billedShuttleCost = billedShuttles * singleShuttlePrice;
+    const billedTotalCost = courtFee + billedShuttleCost;
+    const payingPlayers = totalPlayers - hostCount;
+
+    const requiredHostShuttles = calculateRequiredHostShuttles(
+      courtFee, shuttlesUsed, shuttlePrice, totalPlayers, hostCount, roundingMode
+    );
+    const appliedCoverShuttles = Math.min(additionalShuttles, requiredHostShuttles);
+    const profitShuttles = Math.max(0, additionalShuttles - requiredHostShuttles);
+
+    if (payingPlayers <= 0 || totalPlayers <= 0) {
+      return {
+        isValid: false,
+        actualTotalCost,
+        payingPlayers,
+        playerFee: 0,
+        shuttlesUsed,
+        requiredHostShuttles,
+        appliedCoverShuttles,
+        additionalShuttles,
+        profitShuttles,
+        billedShuttles,
+        billedShuttleCost,
+        billedTotalCost,
+        totalRevenue: 0,
+        netProfit: 0
+      };
+    }
+
+    let playerFee = 0;
+    let totalRevenue = 0;
+
+    if (singleShuttlePrice > 0) {
+      const unroundedFee = billedTotalCost / totalPlayers;
+      playerFee = applyRounding(unroundedFee, roundingMode);
+      totalRevenue = playerFee * payingPlayers;
+    } else {
+      const unroundedFee = actualTotalCost / payingPlayers;
+      playerFee = applyRounding(unroundedFee, roundingMode);
+      totalRevenue = playerFee * payingPlayers;
+    }
+
+    let netProfit = totalRevenue - actualTotalCost;
+    if (Math.abs(netProfit) < 0.005) {
+      netProfit = 0;
+    }
+
+    return {
+      isValid: true,
+      actualTotalCost,
+      payingPlayers,
+      playerFee,
+      shuttlesUsed,
+      requiredHostShuttles,
+      appliedCoverShuttles,
+      additionalShuttles,
+      profitShuttles,
+      billedShuttles,
+      billedShuttleCost,
+      billedTotalCost,
+      totalRevenue,
+      netProfit
+    };
+  }
+
   // ==========================================================================
   // 2. Main Calculation Loop
   // ==========================================================================
@@ -205,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const shuttlePrice = parseFloat(shuttlePriceInput.value) || 0;
     const totalPlayers = parseInt(totalPlayersInput.value) || 0;
     const hostCount = parseInt(hostCountInput.value) || 0;
-    const additionalFee = parseFloat(additionalFeeInput.value) || 0;
+    const additionalShuttles = parseInt(additionalShuttlesInput ? additionalShuttlesInput.value : 0) || 0;
 
     // 2. Compute dynamic time range text
     const endHour = startHour + duration;
@@ -251,44 +354,61 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Compute costs
-    const shuttleCost = (shuttlesUsed * shuttlePrice) / 12;
-    const totalCost = courtFee + shuttleCost;
+    // Highlight active host option button (0, 1, 2 Hosts)
+    hostOptBtns.forEach(btn => {
+      const hVal = parseInt(btn.getAttribute('data-host'));
+      btn.classList.toggle('active', hostCount === hVal);
+    });
 
-    // Calculate bottom reference cards (0 to 2 Hosts)
-    for (let h = 0; h <= 2; h++) {
-      const paying = totalPlayers - h;
-      const displayEl = hostRateDisplays[h];
-      const cardEl = hostRateCards[h];
+    // Determine current active host calculation
+    const calcResult = computeFeeAndBreakdown(
+      courtFee, shuttlesUsed, shuttlePrice, totalPlayers, hostCount, additionalShuttles, roundingMode
+    );
 
-      if (displayEl && cardEl) {
-        let feeStr = '--';
-        if (paying > 0) {
-          const exactFee = (totalCost / paying) + additionalFee;
-          const fee = applyRounding(exactFee, roundingMode);
-          feeStr = formatCurrency(fee);
-        }
-        triggerSpark(displayEl, feeStr);
-
-        // Highlight active host card
-        if (hostCount === h) {
-          cardEl.classList.add('active');
+    // Update Shuttle Status & Recommendation Tags
+    if (shuttleInfoTag) {
+      if (calcResult.requiredHostShuttles > 0) {
+        if (additionalShuttles >= calcResult.requiredHostShuttles) {
+          shuttleInfoTag.textContent = '✅ 已涵盖 Host 成本';
+          shuttleInfoTag.className = 'info-pill-tag success-tag';
         } else {
-          cardEl.classList.remove('active');
+          const remain = calcResult.requiredHostShuttles - additionalShuttles;
+          shuttleInfoTag.textContent = `💡 建议再加 ${remain} 个球覆盖 Host`;
+          shuttleInfoTag.className = 'info-pill-tag warning-tag';
         }
+      } else {
+        shuttleInfoTag.textContent = '✅ 无需加球覆盖 Host';
+        shuttleInfoTag.className = 'info-pill-tag success-tag';
       }
     }
 
-    // 4. Determine paying players
-    const payingPlayers = totalPlayers - hostCount;
+    if (profitShuttlesTag) {
+      const pVal = calcResult.profitShuttles;
+      profitShuttlesTag.textContent = `额外盈利: ${pVal > 0 ? '+' : ''}${pVal} 个`;
+    }
 
-    // 5. Validation: Avoid division by zero
-    if (payingPlayers <= 0) {
+    // Update Bottom Shuttle Summary Statistics Card
+    if (sumActualShuttles) {
+      sumActualShuttles.textContent = `${calcResult.shuttlesUsed} 个`;
+    }
+    if (sumCoverShuttles) {
+      const coverVal = calcResult.appliedCoverShuttles;
+      sumCoverShuttles.textContent = `${coverVal > 0 ? '+' : ''}${coverVal} 个`;
+    }
+    if (sumProfitShuttles) {
+      const pVal = calcResult.profitShuttles;
+      sumProfitShuttles.textContent = `${pVal > 0 ? '+' : ''}${pVal} 个`;
+    }
+    if (sumBilledShuttles) {
+      sumBilledShuttles.textContent = `${calcResult.billedShuttles} 个`;
+    }
+
+    if (!calcResult.isValid) {
       errorBanner.classList.remove('hidden');
       triggerSpark(playerFeeDisplay, '--');
       playerFeeDisplay.className = 'ticker-price error-state';
 
-      triggerSpark(totalCostDisplay, formatCurrency(totalCost));
+      triggerSpark(totalCostDisplay, formatCurrency(calcResult.actualTotalCost));
       triggerSpark(totalRevenueDisplay, '--');
       triggerSpark(netProfitDisplay, '--');
 
@@ -298,27 +418,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     errorBanner.classList.add('hidden');
 
-    // 6. Run calculations with rounding
-    const exactPlayerFee = (totalCost / payingPlayers) + additionalFee;
-    const playerFee = applyRounding(exactPlayerFee, roundingMode);
-    const totalRevenue = playerFee * payingPlayers;
-    let netProfit = totalRevenue - totalCost;
-    if (Math.abs(netProfit) < 0.005) {
-      netProfit = 0;
-    }
-
-    // 7. Update UI with spark animation
-    triggerSpark(playerFeeDisplay, formatCurrency(playerFee));
+    // Update UI with spark animation
+    triggerSpark(playerFeeDisplay, formatCurrency(calcResult.playerFee));
     playerFeeDisplay.className = 'ticker-price has-value';
 
-    triggerSpark(totalCostDisplay, formatCurrency(totalCost));
-    triggerSpark(totalRevenueDisplay, formatCurrency(totalRevenue));
-    triggerSpark(netProfitDisplay, formatCurrency(netProfit));
+    triggerSpark(totalCostDisplay, formatCurrency(calcResult.actualTotalCost));
+    triggerSpark(totalRevenueDisplay, formatCurrency(calcResult.totalRevenue));
+    triggerSpark(netProfitDisplay, formatCurrency(calcResult.netProfit));
 
-    // 8. Style profit highlighting row
-    if (netProfit > 0.005) {
+    // Style profit highlighting row
+    if (calcResult.netProfit > 0.005) {
       profitRow.className = 'summary-row profit-highlight profit-state';
-    } else if (netProfit < -0.005) {
+    } else if (calcResult.netProfit < -0.005) {
       profitRow.className = 'summary-row profit-highlight loss-state';
     } else {
       profitRow.className = 'summary-row profit-highlight';
@@ -403,10 +514,11 @@ document.addEventListener('DOMContentLoaded', () => {
     openDrawer("选择用球数量 (个)", 1, 24, current, shuttlesUsedInput, shuttlesDisplayVal);
   });
 
-  // Direct Host Rates cards selection clicks
-  hostRateCards.forEach(card => {
-    card.addEventListener('click', () => {
-      const hostVal = parseInt(card.getAttribute('data-host'));
+  // Host option button clicks
+  hostOptBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const hostVal = parseInt(btn.getAttribute('data-host'));
       if (!isNaN(hostVal)) {
         hostCountInput.value = hostVal;
         calculate();
@@ -524,10 +636,30 @@ document.addEventListener('DOMContentLoaded', () => {
   durationSlider.addEventListener('input', calculate);
   durationSlider.addEventListener('change', calculate);
   shuttlePriceInput.addEventListener('input', calculate);
-  additionalFeeInput.addEventListener('input', calculate);
+
+  // Stepper buttons for Additional Shuttles (- / +)
+  if (addShuttlesMinusBtn && addShuttlesPlusBtn && additionalShuttlesInput && addShuttlesDisplay) {
+    addShuttlesMinusBtn.addEventListener('click', () => {
+      let current = parseInt(additionalShuttlesInput.value) || 0;
+      if (current > 0) {
+        current--;
+        additionalShuttlesInput.value = current;
+        addShuttlesDisplay.textContent = `${current} 个`;
+        calculate();
+      }
+    });
+
+    addShuttlesPlusBtn.addEventListener('click', () => {
+      let current = parseInt(additionalShuttlesInput.value) || 0;
+      current++;
+      additionalShuttlesInput.value = current;
+      addShuttlesDisplay.textContent = `${current} 个`;
+      calculate();
+    });
+  }
 
   // Auto-format currency inputs on blur
-  [shuttlePriceInput, additionalFeeInput].forEach(input => {
+  [shuttlePriceInput, rateMorningInput, rateEveningInput].forEach(input => {
     input.addEventListener('blur', (e) => {
       const val = parseFloat(e.target.value);
       if (!isNaN(val)) {
@@ -620,7 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // pointer down gesture initialization
   swipeViewport.addEventListener('pointerdown', (e) => {
-    // Escape gesture if target matches any sliders, selection cards, inputs, etc.
+    // Escape gesture if target matches any sliders, selection cards, inputs, buttons, etc.
     if (
       e.target.closest('#duration-slider') ||
       e.target.closest('.drawer-sheet') ||
@@ -628,9 +760,13 @@ document.addEventListener('DOMContentLoaded', () => {
       e.target.closest('select') ||
       e.target.closest('input') ||
       e.target.closest('.segmented-control') ||
-      e.target.closest('.host-rate-card') ||
+      e.target.closest('.host-selector-segmented') ||
+      e.target.closest('.host-opt-btn') ||
       e.target.closest('.qr-image-wrapper') ||
       e.target.closest('.qr-image') ||
+      e.target.closest('.stepper-wrapper') ||
+      e.target.closest('.stepper-btn') ||
+      e.target.closest('button') ||
       e.button !== 0 // Left click/Touch only
     ) {
       return;
@@ -861,18 +997,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================================
-  // 8. Custom QR Code Upload & LocalStorage Persistence
+  // 8. QR Code Image Persistence (LocalStorage)
   // ==========================================================================
 
   function updateQRImages(src) {
     if (qrImage) qrImage.src = src;
     if (qrFullscreenImage) qrFullscreenImage.src = src;
-    
-    if (src.startsWith('data:image')) {
-      resetQrBtn.classList.remove('hidden');
-    } else {
-      resetQrBtn.classList.add('hidden');
-    }
   }
 
   // Load custom QR on start
@@ -881,34 +1011,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateQRImages(customQr);
   } else {
     updateQRImages('assets/duitnow-qr.png');
-  }
-
-  // Bind upload events
-  if (uploadQrBtn && qrFileInput) {
-    uploadQrBtn.addEventListener('click', () => {
-      qrFileInput.click();
-    });
-    
-    qrFileInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          const base64 = evt.target.result;
-          localStorage.setItem('custom-qr', base64);
-          updateQRImages(base64);
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-  }
-
-  if (resetQrBtn) {
-    resetQrBtn.addEventListener('click', () => {
-      localStorage.removeItem('custom-qr');
-      updateQRImages('assets/duitnow-qr.png');
-      if (qrFileInput) qrFileInput.value = '';
-    });
   }
 
   // ==========================================================================
@@ -1001,9 +1103,14 @@ document.addEventListener('DOMContentLoaded', () => {
     copyBillBtn.addEventListener('click', () => {
       const startHour = parseInt(startTimeSelect.value);
       const duration = parseInt(durationSlider.value);
-      const endHour = startHour + duration;
+      const shuttlesUsed = parseInt(shuttlesUsedInput.value) || 0;
+      const shuttlePrice = parseFloat(shuttlePriceInput.value) || 0;
+      const totalPlayers = parseInt(totalPlayersInput.value) || 0;
+      const hostCount = parseInt(hostCountInput.value) || 0;
+      const payingPlayers = totalPlayers - hostCount;
+      const additionalShuttles = parseInt(additionalShuttlesInput ? additionalShuttlesInput.value : 0) || 0;
       const startStr = format12Hour(startHour);
-      const endStr = format12Hour(endHour);
+      const endStr = format12Hour(startHour + duration);
 
       let courtCount = 0;
       for (let i = 0; i < courtRadios.length; i++) {
@@ -1013,38 +1120,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
-      const shuttlesUsed = parseInt(shuttlesUsedInput.value) || 0;
-      const shuttlePrice = parseFloat(shuttlePriceInput.value) || 0;
-      const shuttleCost = (shuttlesUsed * shuttlePrice) / 12;
-
       const { fee: baseCourtFee } = calculateCourtFee(startHour, duration);
       const courtFee = baseCourtFee * courtCount;
 
-      const totalPlayers = parseInt(totalPlayersInput.value) || 0;
-      const hostCount = parseInt(hostCountInput.value) || 0;
-      const payingPlayers = totalPlayers - hostCount;
-      const additionalFee = parseFloat(additionalFeeInput.value) || 0;
-      const totalCost = courtFee + shuttleCost;
+      const calcRes = computeFeeAndBreakdown(
+        courtFee, shuttlesUsed, shuttlePrice, totalPlayers, hostCount, additionalShuttles, roundingMode
+      );
 
       let playerFeeStr = '--';
       let revenueStr = '--';
       let profitStr = '--';
+      let shuttlesUsedStr = shuttlesUsed.toString();
 
-      if (payingPlayers > 0) {
-        const exactPlayerFee = (totalCost / payingPlayers) + additionalFee;
-        const playerFee = applyRounding(exactPlayerFee, roundingMode);
-        playerFeeStr = `RM ${formatCurrency(playerFee)}`;
-        revenueStr = `RM ${formatCurrency(playerFee * payingPlayers)}`;
-        
-        let netProfit = (playerFee * payingPlayers) - totalCost;
-        if (Math.abs(netProfit) < 0.005) {
-          netProfit = 0;
+      if (calcRes.isValid) {
+        if (calcRes.billedShuttles > shuttlesUsed) {
+          let parts = [`实际 ${shuttlesUsed} 个`];
+          if (calcRes.requiredHostShuttles > 0) {
+            parts.push(`覆盖Host需 ${calcRes.requiredHostShuttles} 个`);
+          }
+          if (calcRes.profitShuttles > 0) {
+            parts.push(`额外盈利 +${calcRes.profitShuttles} 个`);
+          }
+          shuttlesUsedStr = `${calcRes.billedShuttles} (${parts.join('，')})`;
         }
-        
-        if (netProfit < 0) {
-          profitStr = `-RM ${formatCurrency(Math.abs(netProfit))}`;
+        playerFeeStr = `RM ${formatCurrency(calcRes.playerFee)}`;
+        revenueStr = `RM ${formatCurrency(calcRes.totalRevenue)}`;
+
+        if (calcRes.netProfit < 0) {
+          profitStr = `-RM ${formatCurrency(Math.abs(calcRes.netProfit))}`;
         } else {
-          profitStr = `RM ${formatCurrency(netProfit)}`;
+          profitStr = `RM ${formatCurrency(calcRes.netProfit)}`;
         }
       }
 
@@ -1054,7 +1159,10 @@ document.addEventListener('DOMContentLoaded', () => {
       else if (roundingMode === 'floor') roundingDesc = " (向下取整)";
 
       const timeRangeStr = `${startStr} - ${endStr}`;
-      const additionalFeeLine = additionalFee > 0 ? `➕ *附加费*：RM ${additionalFee.toFixed(2)} /人\n` : '';
+      const singleShuttlePrice = shuttlePrice > 0 ? (shuttlePrice / 12) : 0;
+      const additionalFeeLine = additionalShuttles > 0
+        ? `➕ *附加用球*：+${additionalShuttles} 个 (RM ${(additionalShuttles * singleShuttlePrice).toFixed(2)})\n`
+        : '';
 
       // Replace placeholders in template dynamically
       const billText = billTemplate
@@ -1062,8 +1170,8 @@ document.addEventListener('DOMContentLoaded', () => {
         .replace(/{DURATION}/g, duration.toString())
         .replace(/{COURT_COUNT}/g, courtCount.toString())
         .replace(/{COURT_FEE}/g, courtFee.toFixed(2))
-        .replace(/{SHUTTLES_USED}/g, shuttlesUsed.toString())
-        .replace(/{SHUTTLE_COST}/g, shuttleCost.toFixed(2))
+        .replace(/{SHUTTLES_USED}/g, shuttlesUsedStr)
+        .replace(/{SHUTTLE_COST}/g, calcRes.billedShuttleCost.toFixed(2))
         .replace(/{SHUTTLE_PRICE}/g, shuttlePrice.toFixed(2))
         .replace(/{TOTAL_PLAYERS}/g, totalPlayers.toString())
         .replace(/{HOST_COUNT}/g, hostCount.toString())
@@ -1071,8 +1179,8 @@ document.addEventListener('DOMContentLoaded', () => {
         .replace(/{PLAYER_FEE}/g, playerFeeStr)
         .replace(/{ROUNDING_DESC}/g, roundingDesc)
         .replace(/{ADDITIONAL_FEE_LINE}/g, additionalFeeLine)
-        .replace(/{ADDITIONAL_FEE}/g, additionalFee.toFixed(2))
-        .replace(/{TOTAL_COST}/g, totalCost.toFixed(2))
+        .replace(/{ADDITIONAL_FEE}/g, (additionalShuttles * singleShuttlePrice).toFixed(2))
+        .replace(/{TOTAL_COST}/g, calcRes.actualTotalCost.toFixed(2))
         .replace(/{TOTAL_REVENUE}/g, revenueStr)
         .replace(/{NET_PROFIT}/g, profitStr);
 
@@ -1098,7 +1206,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================================================
   // 11. Focus Selection UX Enhancements
   // ==========================================================================
-  [shuttlePriceInput, additionalFeeInput, rateMorningInput, rateEveningInput].forEach(input => {
+  [shuttlePriceInput, rateMorningInput, rateEveningInput].forEach(input => {
     if (input) {
       input.addEventListener('focus', (e) => {
         e.target.select();

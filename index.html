@@ -199,10 +199,33 @@
                 </div>
               </div>
 
-              <!-- Row 3: 用球数量 / 羽毛球价格 (同一行两个输入框/选择器) -->
+              <!-- Section 2: 人数与 Host 数量选择 -->
               <div class="input-row-2col">
                 <div class="input-group">
-                  <label>用球数量</label>
+                  <label>参与总人数 (含Host)</label>
+                  <div id="players-picker" class="picker-trigger">
+                    <span id="players-display" class="picker-value">6</span>
+                    <span class="picker-suffix currency-unit">人</span>
+                    <span class="picker-chevron">▼</span>
+                  </div>
+                  <input type="hidden" id="total-players" value="6">
+                </div>
+
+                <div class="input-group">
+                  <label>Host 数量</label>
+                  <div class="host-selector-segmented">
+                    <button type="button" class="host-opt-btn active" data-host="0">0 Host</button>
+                    <button type="button" class="host-opt-btn" data-host="1">1 Host</button>
+                    <button type="button" class="host-opt-btn" data-host="2">2 Host</button>
+                  </div>
+                  <input type="hidden" id="host-count" value="0">
+                </div>
+              </div>
+
+              <!-- Section 3: 用球数量 (真实用球) / 羽毛球价格 -->
+              <div class="input-row-2col">
+                <div class="input-group">
+                  <label>用球数量 (真实用球)</label>
                   <div id="shuttles-picker" class="picker-trigger">
                     <span id="shuttles-display" class="picker-value">3</span>
                     <span class="picker-suffix currency-unit">个</span>
@@ -214,71 +237,59 @@
                   <label for="shuttle-price">羽毛球价格 (桶)</label>
                   <div class="input-wrapper">
                     <span class="input-prefix currency-unit">RM</span>
-                    <input type="number" id="shuttle-price" value="123.00" min="0" step="0.01" placeholder="0.00"
-                      inputmode="decimal">
+                    <input type="number" id="shuttle-price" value="123.00" min="0" step="0.01" placeholder="0.00" inputmode="decimal">
                   </div>
                 </div>
               </div>
 
-              <!-- Row 4: 参与人数 / 附加收费 (同一行) -->
-              <div class="input-row-2col">
-                <div class="input-group">
-                  <label>参与人数</label>
-                  <div id="players-picker" class="picker-trigger">
-                    <span id="players-display" class="picker-value">6</span>
-                    <span class="picker-suffix currency-unit">人</span>
-                    <span class="picker-chevron">▼</span>
-                  </div>
-                  <input type="hidden" id="total-players" value="6">
+              <!-- Section 4: 附加加球 & 状态指示标签 -->
+              <div class="input-group full-width-group">
+                <div class="label-row-between">
+                  <label>附加加球 (用于盈利或覆盖Host)</label>
+                  <span id="shuttle-info-tag" class="info-pill-tag">建议加 2 个球覆盖 Host</span>
                 </div>
-                <div class="input-group">
-                  <label for="additional-fee">附加收费 (每人)</label>
-                  <div class="input-wrapper">
-                    <span class="input-prefix currency-unit">RM</span>
-                    <input type="number" id="additional-fee" value="" min="0" step="0.01" placeholder="0.00"
-                      inputmode="decimal">
+                <div class="stepper-wrapper">
+                  <button type="button" id="add-shuttles-minus" class="stepper-btn" aria-label="减少附加球">&minus;</button>
+                  <div class="stepper-value-group">
+                    <span id="add-shuttles-display" class="stepper-value">0 个</span>
+                    <span id="profit-shuttles-tag" class="profit-subtag">额外盈利: 0 个</span>
                   </div>
+                  <button type="button" id="add-shuttles-plus" class="stepper-btn" aria-label="增加附加球">&plus;</button>
                 </div>
+                <input type="hidden" id="additional-shuttles" value="0">
               </div>
-
-              <input type="hidden" id="host-count" value="0">
-
-              <!-- Host Rates Comparison Panel -->
-              <section class="host-rates-section">
-                <div class="host-rate-title">各 Host 数量每人收费参考 (点击直接修改)</div>
-                <div class="host-rates-grid">
-                  <div class="host-rate-card" id="host-rate-0" data-host="0">
-                    <div class="host-rate-label">0 Host</div>
-                    <div class="host-rate-value">
-                      <span class="currency">RM</span>
-                      <span class="value" id="host-rate-0-display">0.00</span>
-                    </div>
-                  </div>
-                  <div class="host-rate-card" id="host-rate-1" data-host="1">
-                    <div class="host-rate-label">1 Host</div>
-                    <div class="host-rate-value">
-                      <span class="currency">RM</span>
-                      <span class="value" id="host-rate-1-display">0.00</span>
-                    </div>
-                  </div>
-                  <div class="host-rate-card" id="host-rate-2" data-host="2">
-                    <div class="host-rate-label">2 Host</div>
-                    <div class="host-rate-value">
-                      <span class="currency">RM</span>
-                      <span class="value" id="host-rate-2-display">0.00</span>
-                    </div>
-                  </div>
-                </div>
-              </section>
 
             </section>
 
             <!-- Output Displays Section (Row 6, 7, 8) -->
             <section class="outputs-section">
 
+              <!-- 用球统计 (真实用球, Cover用球, 盈利用球, 被计算总用球) -->
+              <div class="shuttle-summary-card">
+                <div class="shuttle-summary-title">🏸 用球统计明细</div>
+                <div class="shuttle-summary-grid">
+                  <div class="shuttle-summary-item">
+                    <span class="item-label">真实用球</span>
+                    <span id="sum-actual-shuttles" class="item-val">0 个</span>
+                  </div>
+                  <div class="shuttle-summary-item">
+                    <span class="item-label">Cover用球</span>
+                    <span id="sum-cover-shuttles" class="item-val tag-blue">0 个</span>
+                  </div>
+                  <div class="shuttle-summary-item">
+                    <span class="item-label">盈利用球</span>
+                    <span id="sum-profit-shuttles" class="item-val tag-green">0 个</span>
+                  </div>
+                  <div class="shuttle-summary-item">
+                    <span class="item-label">被计算总用球</span>
+                    <span id="sum-billed-shuttles" class="item-val tag-accent">0 个</span>
+                  </div>
+                </div>
+              </div>
+
               <!-- Row 6: 总成本 -->
               <div class="summary-row">
-                <span class="summary-label">总成本</span>
+                <span class="summary-label">真实总成本</span>
                 <div class="summary-value-wrapper">
                   <span class="summary-currency currency-unit">RM</span>
                   <span id="total-cost-display" class="summary-value">0.00</span>
@@ -287,7 +298,7 @@
 
               <!-- Row 7: 总收款 -->
               <div class="summary-row">
-                <span class="summary-label">总收款</span>
+                <span class="summary-label">总收款 (付费玩家)</span>
                 <div class="summary-value-wrapper">
                   <span class="summary-currency currency-unit">RM</span>
                   <span id="total-revenue-display" class="summary-value">0.00</span>
