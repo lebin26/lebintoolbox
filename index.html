@@ -70,21 +70,6 @@
               </div>
             </div>
 
-            <!-- Rate Options -->
-            <div class="settings-section">
-              <div class="settings-section-title">费率设置 (RM/小时)</div>
-              <div class="settings-rate-row">
-                <div class="settings-rate-input-group">
-                  <label for="rate-morning-input">🌞 早场</label>
-                  <input type="number" id="rate-morning-input" value="14.84" step="0.01" min="0" placeholder="14.84">
-                </div>
-                <div class="settings-rate-input-group">
-                  <label for="rate-evening-input">🌙 晚场</label>
-                  <input type="number" id="rate-evening-input" value="29.68" step="0.01" min="0" placeholder="29.68">
-                </div>
-              </div>
-            </div>
-
           </div>
         </div>
       </div>
@@ -110,8 +95,22 @@
             <!-- Input Fields Section -->
             <section class="inputs-section">
 
-              <!-- Row 2: 场地费计算参数 (开始时间 / 时长及自动计算的场地费) -->
+              <!-- 场地选择 & 场地费计算参数 -->
               <div class="court-fee-config-box">
+                <!-- 第一页第一项：场地选择 -->
+                <div class="input-group venue-group">
+                  <div class="label-row-between">
+                    <label for="venue-select">选择场地</label>
+                    <span id="venue-rate-badge" class="venue-rate-badge">加载中...</span>
+                  </div>
+                  <div class="input-wrapper select-wrapper">
+                    <select id="venue-select">
+                      <!-- 动态由 venues.txt 加载 -->
+                    </select>
+                    <span class="select-chevron">▼</span>
+                  </div>
+                </div>
+
                 <div class="input-row-2col">
                   <!-- 开始时间 Dropdown -->
                   <div class="input-group">
@@ -183,6 +182,9 @@
 
                     <input type="radio" name="court-count" id="court-3" value="3">
                     <label for="court-3">3 片</label>
+
+                    <input type="radio" name="court-count" id="court-4" value="4">
+                    <label for="court-4">4 片</label>
 
                     <div class="segmented-slider-thumb"></div>
                   </div>

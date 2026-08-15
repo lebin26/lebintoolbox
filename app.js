@@ -23,10 +23,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const sumProfitShuttles = document.getElementById('sum-profit-shuttles');
   const sumBilledShuttles = document.getElementById('sum-billed-shuttles');
 
+  // Venue Select & Rate Badge
+  const venueSelect = document.getElementById('venue-select');
+  const venueRateBadge = document.getElementById('venue-rate-badge');
+
   // Settings & Customization elements
   const roundingSelect = document.getElementById('rounding-select');
-  const rateMorningInput = document.getElementById('rate-morning-input');
-  const rateEveningInput = document.getElementById('rate-evening-input');
   const copyBillBtn = document.getElementById('copy-bill-btn');
 
   // QR elements cached globally
@@ -69,7 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const courtRadiosMap = {
     1: document.getElementById('court-1'),
     2: document.getElementById('court-2'),
-    3: document.getElementById('court-3')
+    3: document.getElementById('court-3'),
+    4: document.getElementById('court-4')
   };
 
   // Host Segmented buttons
@@ -79,15 +82,103 @@ document.addEventListener('DOMContentLoaded', () => {
   const shuttleInfoTag = document.getElementById('shuttle-info-tag');
   const profitShuttlesTag = document.getElementById('profit-shuttles-tag');
 
-  // Pricing constants (Loaded dynamically from localStorage, with defaults)
-  let rateMorning = parseFloat(localStorage.getItem('rate-morning')) || 14.84;
-  let rateEvening = parseFloat(localStorage.getItem('rate-evening')) || 29.68;
+  // Pricing & Venue Data (Loaded dynamically from venues.csv & localStorage)
+  let venues = [
+    { name: 'Lavana Sport Center Setapak', rateMorning: 14.84, rateEvening: 29.68 },
+    { name: 'Setapak Badminton Center (SBC)', rateMorning: 14.00, rateEvening: 28.00 }
+  ];
+  let selectedVenueIndex = 0;
+  let rateMorning = 14.84;
+  let rateEvening = 29.68;
   let roundingMode = localStorage.getItem('rounding-mode') || 'none';
+
+  function updateActiveVenueRates() {
+    const v = venues[selectedVenueIndex] || venues[0];
+    if (v) {
+      rateMorning = v.rateMorning;
+      rateEvening = v.rateEvening;
+      if (venueRateBadge) {
+        venueRateBadge.textContent = `🌞 RM ${v.rateMorning.toFixed(2)} / 🌙 RM ${v.rateEvening.toFixed(2)}`;
+      }
+    }
+    calculate();
+  }
+
+  function populateVenueSelect() {
+    if (!venueSelect) return;
+    venueSelect.innerHTML = '';
+    venues.forEach((v, idx) => {
+      const opt = document.createElement('option');
+      opt.value = idx;
+      opt.textContent = v.name;
+      venueSelect.appendChild(opt);
+    });
+
+    const savedIdx = parseInt(localStorage.getItem('selected-venue-index'));
+    if (!isNaN(savedIdx) && savedIdx >= 0 && savedIdx < venues.length) {
+      selectedVenueIndex = savedIdx;
+    } else {
+      selectedVenueIndex = 0;
+    }
+    venueSelect.value = selectedVenueIndex;
+    updateActiveVenueRates();
+  }
+
+  // Populate immediately with fallback default venues
+  populateVenueSelect();
+
+  // Fetch custom venue database from venues.csv (HTTP/Local server support via start.sh)
+  fetch('venues.csv')
+    .then(response => {
+      if (response.ok) return response.text();
+      throw new Error('venues.csv database file not found or failed to load');
+    })
+    .then(text => {
+      if (text && text.trim()) {
+        const parsedVenues = [];
+        const lines = text.split('\n');
+        for (let line of lines) {
+          line = line.trim();
+          if (!line || line.startsWith('#')) continue;
+          const parts = line.split(/[,，]/);
+          if (parts.length >= 3) {
+            const vName = parts[0].trim();
+            const vMorning = parseFloat(parts[1].trim());
+            const vEvening = parseFloat(parts[2].trim());
+            if (vName && vName !== '场地名称' && !isNaN(vMorning) && !isNaN(vEvening)) {
+              parsedVenues.push({
+                name: vName,
+                rateMorning: vMorning,
+                rateEvening: vEvening
+              });
+            }
+          }
+        }
+        if (parsedVenues.length > 0) {
+          venues = parsedVenues;
+          populateVenueSelect();
+        }
+      }
+    })
+    .catch(err => {
+      console.warn('Using fallback venue list. Reason:', err.message);
+    });
+
+  if (venueSelect) {
+    venueSelect.addEventListener('change', () => {
+      const idx = parseInt(venueSelect.value);
+      if (!isNaN(idx) && idx >= 0 && idx < venues.length) {
+        selectedVenueIndex = idx;
+        localStorage.setItem('selected-venue-index', idx);
+        updateActiveVenueRates();
+      }
+    });
+  }
 
   // Default hardcoded bill copy template fallback
   let billTemplate = '🏸 *Malend 羽毛球费用结算*\n' +
     '📅 *时间*：{TIME_RANGE} ({DURATION} 小时)\n' +
-    '🏟️ *场地*：{COURT_COUNT} 片 × {DURATION} 小时 (RM {COURT_FEE})\n' +
+    '🏟️ *场地*：{VENUE_NAME} ({COURT_COUNT} 片 × {DURATION} 小时，RM {COURT_FEE})\n' +
     '🏸 *用球*：{SHUTTLES_USED} 个 (RM {SHUTTLE_COST}，单价 RM {SHUTTLE_PRICE}/桶)\n' +
     '👥 *人数*：{TOTAL_PLAYERS} 人 (含 {HOST_COUNT} Host，{PAYING_PLAYERS} 人付费)\n' +
     '💰 *每人收费*：*{PLAYER_FEE}*{ROUNDING_DESC}\n' +
@@ -114,8 +205,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
   // Initialize input fields in DOM
-  if (rateMorningInput) rateMorningInput.value = rateMorning.toFixed(2);
-  if (rateEveningInput) rateEveningInput.value = rateEvening.toFixed(2);
   if (roundingSelect) roundingSelect.value = roundingMode;
 
   // Utility to format currency
@@ -539,12 +628,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const x = clientX - courtRect.left;
     const percentage = x / courtRect.width;
     let value = 1;
-    if (percentage < 0.33) {
+    if (percentage < 0.25) {
       value = 1;
-    } else if (percentage < 0.66) {
+    } else if (percentage < 0.5) {
       value = 2;
-    } else {
+    } else if (percentage < 0.75) {
       value = 3;
+    } else {
+      value = 4;
     }
 
     const targetRadio = courtRadiosMap[value];
@@ -659,14 +750,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Auto-format currency inputs on blur
-  [shuttlePriceInput, rateMorningInput, rateEveningInput].forEach(input => {
-    input.addEventListener('blur', (e) => {
+  if (shuttlePriceInput) {
+    shuttlePriceInput.addEventListener('blur', (e) => {
       const val = parseFloat(e.target.value);
       if (!isNaN(val)) {
         e.target.value = val.toFixed(2);
       }
     });
-  });
+  }
 
   // ==========================================================================
   // 5. Swipe Navigation Page System (Pointer Events 1:1, Rubberband & Velocity Handoff)
@@ -1024,28 +1115,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  if (rateMorningInput) {
-    rateMorningInput.addEventListener('change', () => {
-      const val = parseFloat(rateMorningInput.value);
-      if (!isNaN(val) && val >= 0) {
-        rateMorning = val;
-        localStorage.setItem('rate-morning', val);
-        calculate();
-      }
-    });
-  }
-
-  if (rateEveningInput) {
-    rateEveningInput.addEventListener('change', () => {
-      const val = parseFloat(rateEveningInput.value);
-      if (!isNaN(val) && val >= 0) {
-        rateEvening = val;
-        localStorage.setItem('rate-evening', val);
-        calculate();
-      }
-    });
-  }
-
   // ==========================================================================
   // 10. Copy Bill Summary Functionality
   // ==========================================================================
@@ -1164,8 +1233,12 @@ document.addEventListener('DOMContentLoaded', () => {
         ? `➕ *附加用球*：+${additionalShuttles} 个 (RM ${(additionalShuttles * singleShuttlePrice).toFixed(2)})\n`
         : '';
 
+      const curVenue = venues[selectedVenueIndex] || venues[0];
+      const venueName = curVenue ? curVenue.name : '标准场地';
+
       // Replace placeholders in template dynamically
       const billText = billTemplate
+        .replace(/{VENUE_NAME}/g, venueName)
         .replace(/{TIME_RANGE}/g, timeRangeStr)
         .replace(/{DURATION}/g, duration.toString())
         .replace(/{COURT_COUNT}/g, courtCount.toString())
@@ -1206,13 +1279,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================================================
   // 11. Focus Selection UX Enhancements
   // ==========================================================================
-  [shuttlePriceInput, rateMorningInput, rateEveningInput].forEach(input => {
-    if (input) {
-      input.addEventListener('focus', (e) => {
-        e.target.select();
-      });
-    }
-  });
+  if (shuttlePriceInput) {
+    shuttlePriceInput.addEventListener('focus', (e) => {
+      e.target.select();
+    });
+  }
 
   // Run initial calculation
   calculate();
