@@ -14,7 +14,7 @@
     '🧾 *总成本*：RM {TOTAL_COST}\n' +
     '💵 *总收款*：{TOTAL_REVENUE}\n' +
     '📈 *净利润*：{NET_PROFIT}\n\n' +
-    '📌 *付款请划到第二页扫 DuitNow QR 码，谢谢！*';
+    '📌 *付款请划到第二页扫 QR 码，谢谢！*';
 
   function showToast(message) {
     let toast = document.getElementById('copy-toast');

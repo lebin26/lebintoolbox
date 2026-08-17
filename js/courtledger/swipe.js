@@ -65,7 +65,7 @@
       if (pageIndex === 0) {
         swipeTrack.style.transform = 'translate3d(0%, 0, 0)';
         if (toggleViewBtn) {
-          toggleViewBtn.innerHTML = '<span class="btn-icon">📱</span><span class="btn-text">DuitNow-QR</span>';
+          toggleViewBtn.innerHTML = '<span class="btn-icon">📱</span><span class="btn-text">QR</span>';
           toggleViewBtn.classList.remove('active');
         }
       } else {

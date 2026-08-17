@@ -9,4 +9,4 @@
 💵 *总收款*：{TOTAL_REVENUE}
 📈 *净利润*：{NET_PROFIT}
 
-📌 *付款请划到第二页扫 DuitNow QR 码，谢谢！*
+📌 *付款请划到第二页扫 QR 码，谢谢！*
