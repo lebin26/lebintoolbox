@@ -1,5 +1,8 @@
 /* ==========================================================================
-   COURT LEDGER - STYLE ENTRY POINT (BACKWARDS COMPATIBILITY)
+   COURT LEDGER - MASTER STYLESHEET BUNDLE
    ========================================================================== */
 
-@import "./css/main.css";
+@import "./variables.css";
+@import "./base.css";
+@import "./hub.css";
+@import "./courtledger.css";
