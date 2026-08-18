@@ -1,4 +1,4 @@
--- Cloudflare D1 Migration: Create venues table and insert seed data
+-- Cloudflare D1 Migration: Create venues table
 
 CREATE TABLE IF NOT EXISTS venues (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -8,8 +8,3 @@ CREATE TABLE IF NOT EXISTS venues (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-
--- Seed initial venue data
-INSERT OR IGNORE INTO venues (name, rate_morning, rate_evening) VALUES
-('Lavana Sport Center Setapak', 14.84, 29.68),
-('Setapak Badminton Center (SBC)', 14.00, 28.00);

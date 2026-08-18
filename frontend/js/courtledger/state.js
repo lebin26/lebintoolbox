@@ -4,14 +4,11 @@
  */
 
 (function () {
-  let venues = [
-    { id: 1, name: 'Lavana Sport Center Setapak', rateMorning: 14.84, rateEvening: 29.68 },
-    { id: 2, name: 'Setapak Badminton Center (SBC)', rateMorning: 14.00, rateEvening: 28.00 }
-  ];
+  let venues = [];
 
   let selectedVenueIndex = 0;
-  let rateMorning = 14.84;
-  let rateEvening = 29.68;
+  let rateMorning = 0.0;
+  let rateEvening = 0.0;
 
   let onVenueChangeCallback = null;
 
