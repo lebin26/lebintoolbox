@@ -1,24 +1,21 @@
 {
   "name": "host-calculator",
   "version": "1.0.0",
-  "description": "Court Ledger - 羽毛球 AA 算账与实用工具箱 (含 SQLite 数据库后端)",
-  "main": "server.js",
-  "type": "module",
+  "description": "Court Ledger - 羽毛球 AA 算账与实用工具箱 (Cloudflare Worker API & D1 数据库)",
+  "private": true,
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start": "cd frontend && ./start.sh",
+    "worker:dev": "cd worker && npx wrangler dev",
+    "worker:deploy": "cd worker && npx wrangler deploy",
+    "d1:migrate": "cd worker && npx wrangler d1 execute host-calculator-db --remote --file=../migrations/0001_create_venues.sql"
   },
   "keywords": [
     "badminton",
     "calculator",
     "court-ledger",
-    "sqlite"
+    "cloudflare-worker",
+    "cloudflare-d1"
   ],
   "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.21.2",
-    "sqlite3": "^5.1.7"
-  }
+  "license": "ISC"
 }

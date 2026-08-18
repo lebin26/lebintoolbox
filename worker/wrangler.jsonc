@@ -10,7 +10,7 @@
     {
       "binding": "DB",
       "database_name": "host-calculator-db",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+      "database_id": "f4d383d8-ffa7-463e-87b0-088a3dbc7f79",
       "migrations_dir": "../migrations"
     }
   ]

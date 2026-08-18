@@ -16,7 +16,9 @@
   let onVenueChangeCallback = null;
 
   function getApiBaseUrl() {
-    return window.WORKER_API_URL ? window.WORKER_API_URL.replace(/\/$/, '') : '';
+    if (window.WORKER_API_URL) return window.WORKER_API_URL.replace(/\/$/, '');
+    // Default production Cloudflare Worker API endpoint
+    return 'https://hostcalculator-worker.lebin2626.workers.dev';
   }
 
   function getActiveRates() {
