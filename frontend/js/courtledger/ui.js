@@ -487,8 +487,12 @@
       });
     }
 
-    btnManage.addEventListener('click', openModal);
-    if (btnClose) btnClose.addEventListener('click', closeModal);
+    if (btnManage) {
+      btnManage.addEventListener('click', openModal);
+    }
+    if (btnClose) {
+      btnClose.addEventListener('click', closeModal);
+    }
 
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeModal();

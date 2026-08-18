@@ -1315,20 +1315,26 @@ html[data-theme="light"] .copy-bill-btn {
 }
 
 .btn-primary-action {
-  background: var(--color-text-accent);
-  color: #000;
-  font-weight: 700;
-  border: none;
-  padding: 10px 16px;
+  background: #ffffff;
+  color: #000000;
+  font-weight: 800;
+  border: 1px solid var(--color-border);
+  padding: 12px 18px;
   border-radius: var(--border-radius);
   cursor: pointer;
   flex: 1;
-  font-size: 0.9rem;
-  transition: transform 0.1s ease, filter 0.15s ease;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  transition: transform 0.1s ease, filter 0.15s ease, background 0.2s ease, color 0.2s ease;
+}
+
+html[data-theme="light"] .btn-primary-action {
+  background: #000000;
+  color: #ffffff;
 }
 
 .btn-primary-action:hover {
-  filter: brightness(1.1);
+  filter: brightness(0.9);
 }
 
 .btn-primary-action:active {

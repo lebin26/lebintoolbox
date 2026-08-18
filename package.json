@@ -7,7 +7,8 @@
     "start": "cd frontend && ./start.sh",
     "worker:dev": "cd worker && npx wrangler dev",
     "worker:deploy": "cd worker && npx wrangler deploy",
-    "d1:migrate": "cd worker && npx wrangler d1 execute host-calculator-db --remote --file=../migrations/0001_create_venues.sql"
+    "d1:migrate": "cd worker && npx wrangler d1 execute host-calculator-db --remote --file=../migrations/0001_create_venues.sql",
+    "d1:migrate:local": "cd worker && npx wrangler d1 execute host-calculator-db --local --file=../migrations/0001_create_venues.sql"
   },
   "keywords": [
     "badminton",

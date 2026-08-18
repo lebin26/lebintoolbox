@@ -383,6 +383,56 @@
     </main>
   </div>
 
+  <!-- Modal: 球场 D1 数据库管理弹窗 -->
+  <div id="court-manage-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">🏸 球场数据库管理</h3>
+          <span class="db-status-badge">⚡ Cloudflare D1 云端数据库</span>
+        </div>
+        <button type="button" class="modal-close-btn" id="court-modal-close">&times;</button>
+      </div>
+      
+      <div class="modal-body">
+        <!-- Form to Add/Edit Venue -->
+        <div class="manage-form-card">
+          <h4 id="manage-form-title">➕ 添加新球场</h4>
+          <input type="hidden" id="venue-edit-id" value="">
+          
+          <div class="form-group">
+            <label for="venue-name-input">球场名称</label>
+            <input type="text" id="venue-name-input" placeholder="例如: Lavana Sport Center Setapak" class="modal-input">
+          </div>
+          
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label for="venue-morning-input">早场单价 (RM/h)</label>
+              <input type="number" id="venue-morning-input" step="0.01" min="0" placeholder="14.84" class="modal-input">
+            </div>
+            <div class="form-group">
+              <label for="venue-evening-input">晚场单价 (RM/h)</label>
+              <input type="number" id="venue-evening-input" step="0.01" min="0" placeholder="29.68" class="modal-input">
+            </div>
+          </div>
+          
+          <div class="form-actions">
+            <button type="button" id="btn-save-venue" class="btn-primary-action">💾 保存至云端数据库</button>
+            <button type="button" id="btn-cancel-edit-venue" class="btn-secondary-action hidden">取消编辑</button>
+          </div>
+        </div>
+
+        <!-- Venue List Container -->
+        <div class="venues-list-container">
+          <h4>📋 已存数据库球场列表</h4>
+          <div id="modal-venues-list" class="modal-venues-list">
+            <!-- 动态渲染数据 -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Reusable Custom Bottom-Sheet Modal Drawer -->
   <div id="drawer-overlay" class="drawer-overlay hidden">
     <div class="drawer-sheet">

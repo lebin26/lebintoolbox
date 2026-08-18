@@ -17,6 +17,12 @@
 
   function getApiBaseUrl() {
     if (window.WORKER_API_URL) return window.WORKER_API_URL.replace(/\/$/, '');
+
+    // Auto-detect local testing environment
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:8787';
+    }
+
     // Default production Cloudflare Worker API endpoint
     return 'https://hostcalculator-worker.lebin2626.workers.dev';
   }

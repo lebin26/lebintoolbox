@@ -2,10 +2,13 @@
 node_modules/
 package-lock.json
 
-# Cloudflare Wrangler & Local dev database
+# Cloudflare Wrangler, Logs & Local dev database
 .wrangler/
 data/
 *.sqlite
+*.log
+.env
+.dev.vars
 
 # OS generated files
 .DS_Store
