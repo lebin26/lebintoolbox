@@ -16,7 +16,6 @@ HostCalculator/
 ├── frontend/                     # 前端静态 Web 应用 (GitHub Pages)
 │   ├── index.html                # 主页面入口
 │   ├── app.js                    # 主逻辑入口
-│   ├── venues.csv                # CSV 本地备份/离线 Fallback
 │   ├── start.sh                  # 本地测试启动脚本
 │   ├── assets/                   # 图标与二维码
 │   ├── views/                    # View 视图模板 (算账主页与工具箱)

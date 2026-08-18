@@ -585,7 +585,7 @@ input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-input[type="number"] { -moz-appearance: textfield; }
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
 /* Dropdown styling */
 .select-wrapper { cursor: pointer; }
@@ -727,6 +727,7 @@ input[type="number"] { -moz-appearance: textfield; }
 
 input[type="range"] {
   -webkit-appearance: none;
+  appearance: none;
   width: 100%;
   background: transparent;
   outline: none;

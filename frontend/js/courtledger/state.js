@@ -1,6 +1,6 @@
 /**
  * Court Ledger - Domain State Module
- * Manages venue pricing dataset (Cloudflare D1 / SQLite API / venues.csv fallback) and selected venue state.
+ * Manages venue pricing dataset (Cloudflare D1 Database API) and selected venue state.
  */
 
 (function () {
@@ -84,49 +84,9 @@
         return true;
       }
     } catch (err) {
-      console.warn('⚠️ Cloudflare Worker / DB API unavailable, attempting CSV fallback:', err.message);
+      console.warn('⚠️ Cloudflare Worker / D1 Database API unavailable:', err.message);
     }
     return false;
-  }
-
-  function fetchVenuesFromCSV() {
-    return fetch('venues.csv')
-      .then(response => {
-        if (response.ok) return response.text();
-        throw new Error('venues.csv database file not found or failed to load');
-      })
-      .then(text => {
-        if (text && text.trim()) {
-          const parsedVenues = [];
-          const lines = text.split('\n');
-          let idCounter = 1;
-          for (let line of lines) {
-            line = line.trim();
-            if (!line || line.startsWith('#')) continue;
-            const parts = line.split(/[,，]/);
-            if (parts.length >= 3) {
-              const vName = parts[0].trim();
-              const vMorning = parseFloat(parts[1].trim());
-              const vEvening = parseFloat(parts[2].trim());
-              if (vName && vName !== '场地名称' && !isNaN(vMorning) && !isNaN(vEvening)) {
-                parsedVenues.push({
-                  id: idCounter++,
-                  name: vName,
-                  rateMorning: vMorning,
-                  rateEvening: vEvening
-                });
-              }
-            }
-          }
-          if (parsedVenues.length > 0) {
-            venues = parsedVenues;
-            populateVenueSelect();
-          }
-        }
-      })
-      .catch(err => {
-        console.warn('Using default fallback venue list. Reason:', err.message);
-      });
   }
 
   async function initVenueState(onChange) {
@@ -135,11 +95,8 @@
 
     populateVenueSelect();
 
-    // Try Database API first, fallback to CSV if API is unreachable
-    const loadedFromDB = await fetchVenuesFromDatabase();
-    if (!loadedFromDB) {
-      await fetchVenuesFromCSV();
-    }
+    // Fetch venues directly from Cloudflare D1 Database API
+    await fetchVenuesFromDatabase();
 
     if (venueSelect) {
       venueSelect.addEventListener('change', () => {
