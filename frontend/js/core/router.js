@@ -48,12 +48,14 @@
         }
       }
 
-      if (toggleViewBtn) {
-        if (targetViewId === 'courtledger') {
-          toggleViewBtn.classList.remove('hidden');
-        } else {
-          toggleViewBtn.classList.add('hidden');
-        }
+      const hubHeaderActions = document.getElementById('hub-header-actions');
+      const courtledgerHeaderActions = document.getElementById('courtledger-header-actions');
+
+      if (hubHeaderActions) {
+        hubHeaderActions.classList.toggle('hidden', targetViewId !== 'hub');
+      }
+      if (courtledgerHeaderActions) {
+        courtledgerHeaderActions.classList.toggle('hidden', targetViewId !== 'courtledger');
       }
 
       window.scrollTo({ top: 0, behavior: 'smooth' });

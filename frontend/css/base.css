@@ -177,6 +177,22 @@ html[data-theme="light"] .blob-3 {
   transition: background var(--transition-speed), transform 150ms var(--ease-out-premium);
 }
 
+.tv-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-header-actions.hidden {
+  display: none !important;
+}
+
 .nav-back-btn:hover {
   background: hsla(0, 0%, 100%, 0.16);
   transform: translateX(-2px);

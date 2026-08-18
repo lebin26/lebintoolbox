@@ -37,38 +37,44 @@
         <span id="header-app-title" class="tv-title">Tools</span>
       </div>
       <div class="tv-header-actions">
-        <!-- Subpage action button (QR toggle for Court Ledger) -->
-        <button id="toggle-view-btn" class="tv-btn-toggle hidden" title="Toggle View">
-          <span class="btn-icon">📱</span>
-          <span class="btn-text">QR</span>
-        </button>
-
-        <!-- Global Settings Dropdown -->
-        <div class="settings-container">
-          <button id="settings-btn" class="tv-btn-settings" title="Settings">
-            <span class="btn-icon">⚙️</span>
-          </button>
-          <div id="settings-dropdown" class="settings-dropdown hidden">
-            <!-- Theme Selection -->
-            <div class="settings-section">
-              <div class="settings-section-title">切换显示模式</div>
-              <div class="theme-options">
-                <button class="theme-opt-btn" data-theme="dark">
-                  <span class="opt-icon">🌙</span>
-                  <span class="opt-text">深色</span>
-                </button>
-                <button class="theme-opt-btn" data-theme="light">
-                  <span class="opt-icon">☀️</span>
-                  <span class="opt-text">浅色</span>
-                </button>
-                <button class="theme-opt-btn" data-theme="system">
-                  <span class="opt-icon">💻</span>
-                  <span class="opt-text">跟随系统</span>
-                </button>
+        <!-- 1. Hub View Header Actions (主页专属设置: 主题模式) -->
+        <div id="hub-header-actions" class="view-header-actions">
+          <div class="settings-container">
+            <button id="settings-btn" class="tv-btn-settings" title="主页外观设置">
+              <span class="btn-icon">⚙️</span>
+            </button>
+            <div id="settings-dropdown" class="settings-dropdown hidden">
+              <!-- Theme Selection -->
+              <div class="settings-section">
+                <div class="settings-section-title">切换显示模式</div>
+                <div class="theme-options">
+                  <button class="theme-opt-btn" data-theme="dark">
+                    <span class="opt-icon">🌙</span>
+                    <span class="opt-text">深色</span>
+                  </button>
+                  <button class="theme-opt-btn" data-theme="light">
+                    <span class="opt-icon">☀️</span>
+                    <span class="opt-text">浅色</span>
+                  </button>
+                  <button class="theme-opt-btn" data-theme="system">
+                    <span class="opt-icon">💻</span>
+                    <span class="opt-text">跟随系统</span>
+                  </button>
+                </div>
               </div>
             </div>
-
           </div>
+        </div>
+
+        <!-- 2. Court Ledger View Header Actions (Court Ledger 页面专属设置: 球场管理与 QR) -->
+        <div id="courtledger-header-actions" class="view-header-actions hidden">
+          <button id="btn-manage-venues" class="tv-btn-settings" title="球场数据库管理">
+            <span class="btn-icon">⚙️</span>
+          </button>
+          <button id="toggle-view-btn" class="tv-btn-toggle" title="Toggle View">
+            <span class="btn-icon">📱</span>
+            <span class="btn-text">QR</span>
+          </button>
         </div>
       </div>
     </header>
