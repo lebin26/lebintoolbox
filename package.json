@@ -9,7 +9,8 @@
     "worker:deploy": "cd worker && npx wrangler deploy",
     "d1:migrate": "cd worker && npx wrangler d1 execute host-calculator-db --remote --file=../migrations/0001_create_venues.sql",
     "d1:migrate:local": "cd worker && npx wrangler d1 execute host-calculator-db --local --file=../migrations/0001_create_venues.sql",
-    "d1:sync:data": "cd worker && npx wrangler d1 export host-calculator-db --local --no-schema --output=./dump_data.sql && sed -i '' 's/INSERT INTO/INSERT OR REPLACE INTO/g' ./dump_data.sql && npx wrangler d1 execute host-calculator-db --remote --file=./dump_data.sql && rm ./dump_data.sql"
+    "d1:sync:data": "cd worker && npx wrangler d1 export host-calculator-db --local --no-schema --output=./dump_data.sql && sed -i '' 's/INSERT INTO/INSERT OR REPLACE INTO/g' ./dump_data.sql && npx wrangler d1 execute host-calculator-db --remote --file=./dump_data.sql && rm ./dump_data.sql",
+    "d1:pull": "cd worker && rm -rf .wrangler/state/v3/d1 && npx wrangler d1 export host-calculator-db --remote --output=./dump_remote.sql && npx wrangler d1 execute host-calculator-db --local --file=./dump_remote.sql && rm ./dump_remote.sql"
   },
   "keywords": [
     "badminton",
