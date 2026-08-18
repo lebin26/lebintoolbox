@@ -52,7 +52,7 @@
     venues.forEach((v, idx) => {
       const opt = document.createElement('option');
       opt.value = idx;
-      opt.textContent = `${v.name} (RM ${v.rateMorning}/${v.rateEvening})`;
+      opt.textContent = v.name;
       venueSelect.appendChild(opt);
     });
 
