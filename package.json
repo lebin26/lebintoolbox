@@ -8,7 +8,8 @@
     "worker:dev": "cd worker && npx wrangler dev",
     "worker:deploy": "cd worker && npx wrangler deploy",
     "d1:migrate": "cd worker && npx wrangler d1 execute host-calculator-db --remote --file=../migrations/0001_create_venues.sql",
-    "d1:migrate:local": "cd worker && npx wrangler d1 execute host-calculator-db --local --file=../migrations/0001_create_venues.sql"
+    "d1:migrate:local": "cd worker && npx wrangler d1 execute host-calculator-db --local --file=../migrations/0001_create_venues.sql",
+    "d1:sync:data": "cd worker && npx wrangler d1 export host-calculator-db --local --output=./dump_data.sql && npx wrangler d1 execute host-calculator-db --remote --file=./dump_data.sql && rm ./dump_data.sql"
   },
   "keywords": [
     "badminton",
