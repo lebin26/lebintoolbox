@@ -66,15 +66,31 @@
           </div>
         </div>
 
-        <!-- 2. Court Ledger View Header Actions (Court Ledger 页面专属设置: 球场管理与 QR) -->
+        <!-- 2. Court Ledger View Header Actions (先 QR 按钮，后设置按钮) -->
         <div id="courtledger-header-actions" class="view-header-actions hidden">
-          <button id="btn-manage-venues" class="tv-btn-settings" title="球场数据库管理">
-            <span class="btn-icon">⚙️</span>
-          </button>
+          <!-- 1. QR 按钮 -->
           <button id="toggle-view-btn" class="tv-btn-toggle" title="Toggle View">
             <span class="btn-icon">📱</span>
             <span class="btn-text">QR</span>
           </button>
+
+          <!-- 2. Court Ledger 设置按钮 & 下拉菜单 -->
+          <div class="settings-container">
+            <button id="courtledger-settings-btn" class="tv-btn-settings" title="Court Ledger 设置">
+              <span class="btn-icon">⚙️</span>
+            </button>
+            <div id="courtledger-settings-dropdown" class="settings-dropdown hidden">
+              <div class="settings-section">
+                <div class="settings-section-title">Court Ledger 设置</div>
+                <div class="settings-menu-list">
+                  <button type="button" class="settings-menu-item" id="menu-manage-venues">
+                    <span class="opt-icon">🏸</span>
+                    <span class="opt-text">球场数据库管理</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </header>

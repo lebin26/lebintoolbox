@@ -371,6 +371,10 @@
 
   // Bindings for Court Database Management Modal
   function initCourtManagementModal(calculateCallback) {
+    const clSettingsBtn = document.getElementById('courtledger-settings-btn');
+    const clSettingsDropdown = document.getElementById('courtledger-settings-dropdown');
+    const menuManage = document.getElementById('menu-manage-venues');
+
     const btnManage = document.getElementById('btn-manage-venues');
     const modal = document.getElementById('court-manage-modal');
     const btnClose = document.getElementById('court-modal-close');
@@ -383,7 +387,32 @@
     const btnCancel = document.getElementById('btn-cancel-edit-venue');
     const listContainer = document.getElementById('modal-venues-list');
 
-    if (!btnManage || !modal) return;
+    if (clSettingsBtn && clSettingsDropdown) {
+      clSettingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isHidden = clSettingsDropdown.classList.toggle('hidden');
+        clSettingsBtn.classList.toggle('active', !isHidden);
+      });
+
+      clSettingsDropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+
+      document.addEventListener('click', () => {
+        clSettingsDropdown.classList.add('hidden');
+        clSettingsBtn.classList.remove('active');
+      });
+    }
+
+    if (menuManage) {
+      menuManage.addEventListener('click', () => {
+        if (clSettingsDropdown) clSettingsDropdown.classList.add('hidden');
+        if (clSettingsBtn) clSettingsBtn.classList.remove('active');
+        openModal();
+      });
+    }
+
+    if (!modal) return;
 
     function resetForm() {
       editIdInput.value = '';
