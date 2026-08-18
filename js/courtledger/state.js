@@ -1,12 +1,12 @@
 /**
  * Court Ledger - Domain State Module
- * Manages venue pricing dataset (venues.csv) and selected venue state.
+ * Manages venue pricing dataset (SQLite API / venues.csv fallback) and selected venue state.
  */
 
 (function () {
   let venues = [
-    { name: 'Lavana Sport Center Setapak', rateMorning: 14.84, rateEvening: 29.68 },
-    { name: 'Setapak Badminton Center (SBC)', rateMorning: 14.00, rateEvening: 28.00 }
+    { id: 1, name: 'Lavana Sport Center Setapak', rateMorning: 14.84, rateEvening: 29.68 },
+    { id: 2, name: 'Setapak Badminton Center (SBC)', rateMorning: 14.00, rateEvening: 28.00 }
   ];
 
   let selectedVenueIndex = 0;
@@ -19,19 +19,19 @@
     const v = venues[selectedVenueIndex] || venues[0];
     return {
       venueName: v ? v.name : '标准场地',
-      rateMorning: v ? v.rateMorning : 14.84,
-      rateEvening: v ? v.rateEvening : 29.68
+      rateMorning: v ? (typeof v.rateMorning === 'number' ? v.rateMorning : parseFloat(v.rateMorning)) : 14.84,
+      rateEvening: v ? (typeof v.rateEvening === 'number' ? v.rateEvening : parseFloat(v.rateEvening)) : 29.68
     };
   }
 
   function updateActiveVenueRates() {
     const v = venues[selectedVenueIndex] || venues[0];
     if (v) {
-      rateMorning = v.rateMorning;
-      rateEvening = v.rateEvening;
+      rateMorning = typeof v.rateMorning === 'number' ? v.rateMorning : parseFloat(v.rateMorning);
+      rateEvening = typeof v.rateEvening === 'number' ? v.rateEvening : parseFloat(v.rateEvening);
       const venueRateBadge = document.getElementById('venue-rate-badge');
       if (venueRateBadge) {
-        venueRateBadge.textContent = `🌞 RM ${v.rateMorning.toFixed(2)} / 🌙 RM ${v.rateEvening.toFixed(2)}`;
+        venueRateBadge.textContent = `🌞 RM ${rateMorning.toFixed(2)} / 🌙 RM ${rateEvening.toFixed(2)}`;
       }
     }
     if (typeof onVenueChangeCallback === 'function') {
@@ -46,7 +46,7 @@
     venues.forEach((v, idx) => {
       const opt = document.createElement('option');
       opt.value = idx;
-      opt.textContent = v.name;
+      opt.textContent = `${v.name} (RM ${v.rateMorning}/${v.rateEvening})`;
       venueSelect.appendChild(opt);
     });
 
@@ -60,13 +60,24 @@
     updateActiveVenueRates();
   }
 
-  function initVenueState(onChange) {
-    onVenueChangeCallback = onChange;
-    const venueSelect = document.getElementById('venue-select');
+  async function fetchVenuesFromDatabase() {
+    try {
+      const response = await fetch('/api/venues');
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      if (data && Array.isArray(data.venues) && data.venues.length > 0) {
+        venues = data.venues;
+        populateVenueSelect();
+        return true;
+      }
+    } catch (err) {
+      console.warn('⚠️ Database API unavailable, attempting CSV fallback:', err.message);
+    }
+    return false;
+  }
 
-    populateVenueSelect();
-
-    fetch('venues.csv')
+  function fetchVenuesFromCSV() {
+    return fetch('venues.csv')
       .then(response => {
         if (response.ok) return response.text();
         throw new Error('venues.csv database file not found or failed to load');
@@ -75,6 +86,7 @@
         if (text && text.trim()) {
           const parsedVenues = [];
           const lines = text.split('\n');
+          let idCounter = 1;
           for (let line of lines) {
             line = line.trim();
             if (!line || line.startsWith('#')) continue;
@@ -85,6 +97,7 @@
               const vEvening = parseFloat(parts[2].trim());
               if (vName && vName !== '场地名称' && !isNaN(vMorning) && !isNaN(vEvening)) {
                 parsedVenues.push({
+                  id: idCounter++,
                   name: vName,
                   rateMorning: vMorning,
                   rateEvening: vEvening
@@ -99,8 +112,21 @@
         }
       })
       .catch(err => {
-        console.warn('Using fallback venue list. Reason:', err.message);
+        console.warn('Using default fallback venue list. Reason:', err.message);
       });
+  }
+
+  async function initVenueState(onChange) {
+    onVenueChangeCallback = onChange;
+    const venueSelect = document.getElementById('venue-select');
+
+    populateVenueSelect();
+
+    // Try Database API first, fallback to CSV if API is unreachable
+    const loadedFromDB = await fetchVenuesFromDatabase();
+    if (!loadedFromDB) {
+      await fetchVenuesFromCSV();
+    }
 
     if (venueSelect) {
       venueSelect.addEventListener('change', () => {
@@ -114,11 +140,96 @@
     }
   }
 
+  // Database CRUD Actions
+
+  async function addVenue(name, rateMorning, rateEvening) {
+    try {
+      const response = await fetch('/api/venues', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, rateMorning, rateEvening })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '添加球场失败');
+      
+      await fetchVenuesFromDatabase();
+      // Select the newly added venue (last in list)
+      selectedVenueIndex = venues.length - 1;
+      localStorage.setItem('selected-venue-index', selectedVenueIndex);
+      populateVenueSelect();
+      return data;
+    } catch (err) {
+      // Offline fallback: append locally
+      const localId = Date.now();
+      const newVenue = {
+        id: localId,
+        name: name.trim(),
+        rateMorning: parseFloat(rateMorning),
+        rateEvening: parseFloat(rateEvening)
+      };
+      venues.push(newVenue);
+      selectedVenueIndex = venues.length - 1;
+      populateVenueSelect();
+      return { venue: newVenue, warning: '已保存在当前会话（离线模式）' };
+    }
+  }
+
+  async function updateVenue(id, name, rateMorning, rateEvening) {
+    try {
+      const response = await fetch(`/api/venues/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, rateMorning, rateEvening })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '更新球场失败');
+
+      await fetchVenuesFromDatabase();
+      populateVenueSelect();
+      return data;
+    } catch (err) {
+      // Offline fallback: update locally
+      const idx = venues.findIndex(v => v.id === id);
+      if (idx !== -1) {
+        venues[idx].name = name.trim();
+        venues[idx].rateMorning = parseFloat(rateMorning);
+        venues[idx].rateEvening = parseFloat(rateEvening);
+        populateVenueSelect();
+      }
+      return { warning: '已在本地更新（离线模式）' };
+    }
+  }
+
+  async function deleteVenue(id) {
+    try {
+      const response = await fetch(`/api/venues/${id}`, {
+        method: 'DELETE'
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '删除球场失败');
+
+      await fetchVenuesFromDatabase();
+      selectedVenueIndex = 0;
+      populateVenueSelect();
+      return data;
+    } catch (err) {
+      // Offline fallback: delete locally
+      venues = venues.filter(v => v.id !== id);
+      selectedVenueIndex = 0;
+      populateVenueSelect();
+      return { warning: '已在本地删除（离线模式）' };
+    }
+  }
+
   window.CourtLedgerState = {
-    venues,
+    get venues() { return venues; },
     getActiveRates,
     updateActiveVenueRates,
     populateVenueSelect,
-    initVenueState
+    initVenueState,
+    fetchVenuesFromDatabase,
+    addVenue,
+    updateVenue,
+    deleteVenue
   };
 })();

@@ -1,0 +1,24 @@
+{
+  "name": "host-calculator",
+  "version": "1.0.0",
+  "description": "Court Ledger - 羽毛球 AA 算账与实用工具箱 (含 SQLite 数据库后端)",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "badminton",
+    "calculator",
+    "court-ledger",
+    "sqlite"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "sqlite3": "^5.1.7"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "hostcalculator-worker",
+  "version": "1.0.0",
+  "description": "HostCalculator Cloudflare Worker API connected to D1 Database",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "wrangler": "^3.109.2"
+  }
+}
