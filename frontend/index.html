@@ -23,6 +23,9 @@
     <!-- Top Bar with Navigation & Global Settings -->
     <header class="tv-header">
       <div class="tv-logo-area">
+        <button id="admin-menu-toggle-btn" class="nav-hamburger-btn hidden" title="展开管理菜单">
+          <span class="btn-icon">☰</span>
+        </button>
         <button id="back-to-hub-btn" class="nav-back-btn hidden" title="back">
           <span class="btn-icon">←</span>
           <span class="btn-text">OmniBox</span>
@@ -579,8 +582,11 @@
       <!-- VIEW 4: ADMIN DASHBOARD & SYSTEM MANAGEMENT -->
       <!-- ========================================== -->
       <div id="view-admin" class="app-view admin-view-container hidden">
+        <!-- Mobile Drawer Backdrop -->
+        <div id="admin-mobile-backdrop" class="admin-mobile-backdrop hidden"></div>
+
         <div class="admin-layout-wrapper">
-          <!-- Left Vertical Sidebar Tabs -->
+          <!-- Left Vertical Sidebar Tabs / Mobile Drawer -->
           <aside class="admin-sidebar" id="admin-sidebar">
             <div class="admin-sidebar-header">
               <div class="admin-sidebar-badge">
@@ -590,8 +596,11 @@
                   <span class="admin-sidebar-sub">Master Console</span>
                 </div>
               </div>
-              <button type="button" id="admin-sidebar-toggle-btn" class="admin-sidebar-toggle-btn" title="展开/收起侧边栏">
+              <button type="button" id="admin-sidebar-toggle-btn" class="admin-sidebar-toggle-btn" title="收起/展开侧边栏">
                 <span class="toggle-icon">☰</span>
+              </button>
+              <button type="button" id="admin-sidebar-close-btn" class="admin-sidebar-close-btn" title="关闭菜单">
+                <span class="toggle-icon">✕</span>
               </button>
             </div>
 

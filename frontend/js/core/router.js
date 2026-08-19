@@ -90,12 +90,16 @@
 
       const hubHeaderActions = document.getElementById('hub-header-actions');
       const courtledgerHeaderActions = document.getElementById('courtledger-header-actions');
+      const adminMenuToggleBtn = document.getElementById('admin-menu-toggle-btn');
 
       if (hubHeaderActions) {
         hubHeaderActions.classList.toggle('hidden', targetViewId !== 'hub');
       }
       if (courtledgerHeaderActions) {
         courtledgerHeaderActions.classList.toggle('hidden', targetViewId !== 'courtledger');
+      }
+      if (adminMenuToggleBtn) {
+        adminMenuToggleBtn.classList.toggle('hidden', targetViewId !== 'admin');
       }
 
       if (targetViewId === 'courtledger') {

@@ -21,23 +21,30 @@
   function initAdminUI() {
     const tabBtns = document.querySelectorAll('.admin-tab-btn');
     const tabPanels = document.querySelectorAll('.admin-tab-panel');
-
-    tabBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const targetTab = btn.getAttribute('data-tab');
-        tabBtns.forEach(b => b.classList.toggle('active', b === btn));
-        tabPanels.forEach(p => p.classList.toggle('hidden', p.id !== `admin-tab-${targetTab}`));
-        activeTab = targetTab;
-        loadActiveTabData();
-      });
-    });
-
-    // Sidebar Collapse / Expand Toggle
-    const sidebarToggleBtn = document.getElementById('admin-sidebar-toggle-btn');
     const adminSidebar = document.getElementById('admin-sidebar');
+    const adminMobileBackdrop = document.getElementById('admin-mobile-backdrop');
+    const headerMenuToggleBtn = document.getElementById('admin-menu-toggle-btn');
+    const sidebarToggleBtn = document.getElementById('admin-sidebar-toggle-btn');
+    const sidebarCloseBtn = document.getElementById('admin-sidebar-close-btn');
     const adminLayoutWrapper = document.querySelector('.admin-layout-wrapper');
 
-    function toggleSidebar() {
+    function isMobileView() {
+      return window.innerWidth <= 820;
+    }
+
+    function openMobileDrawer() {
+      if (adminSidebar) adminSidebar.classList.add('mobile-open');
+      if (adminMobileBackdrop) adminMobileBackdrop.classList.remove('hidden');
+      document.body.classList.add('modal-open');
+    }
+
+    function closeMobileDrawer() {
+      if (adminSidebar) adminSidebar.classList.remove('mobile-open');
+      if (adminMobileBackdrop) adminMobileBackdrop.classList.add('hidden');
+      document.body.classList.remove('modal-open');
+    }
+
+    function toggleDesktopSidebar() {
       if (!adminSidebar) return;
       const willCollapse = !adminSidebar.classList.contains('collapsed');
       adminSidebar.classList.toggle('collapsed', willCollapse);
@@ -45,18 +52,68 @@
       localStorage.setItem('omnibox_admin_sidebar_collapsed', willCollapse ? 'true' : 'false');
     }
 
+    // Tab button selection
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetTab = btn.getAttribute('data-tab');
+        tabBtns.forEach(b => b.classList.toggle('active', b === btn));
+        tabPanels.forEach(p => p.classList.toggle('hidden', p.id !== `admin-tab-${targetTab}`));
+        activeTab = targetTab;
+        loadActiveTabData();
+
+        // On mobile, automatically close the drawer after picking a destination
+        if (isMobileView()) {
+          closeMobileDrawer();
+        }
+      });
+    });
+
     if (adminSidebar) {
-      // Restore persisted state
-      const isCollapsed = localStorage.getItem('omnibox_admin_sidebar_collapsed') === 'true';
-      if (isCollapsed) {
-        adminSidebar.classList.add('collapsed');
-        if (adminLayoutWrapper) adminLayoutWrapper.classList.add('sidebar-collapsed');
+      // Restore persisted desktop state
+      if (!isMobileView()) {
+        const isCollapsed = localStorage.getItem('omnibox_admin_sidebar_collapsed') === 'true';
+        if (isCollapsed) {
+          adminSidebar.classList.add('collapsed');
+          if (adminLayoutWrapper) adminLayoutWrapper.classList.add('sidebar-collapsed');
+        }
       }
 
+      // Top Header Hamburger Button (Open drawer on mobile / Toggle sidebar on desktop)
+      if (headerMenuToggleBtn) {
+        headerMenuToggleBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (isMobileView()) {
+            if (adminSidebar.classList.contains('mobile-open')) {
+              closeMobileDrawer();
+            } else {
+              openMobileDrawer();
+            }
+          } else {
+            toggleDesktopSidebar();
+          }
+        });
+      }
+
+      // Sidebar Internal Toggle Button (Desktop)
       if (sidebarToggleBtn) {
         sidebarToggleBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          toggleSidebar();
+          toggleDesktopSidebar();
+        });
+      }
+
+      // Sidebar Close Button (Mobile)
+      if (sidebarCloseBtn) {
+        sidebarCloseBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          closeMobileDrawer();
+        });
+      }
+
+      // Backdrop tap to dismiss
+      if (adminMobileBackdrop) {
+        adminMobileBackdrop.addEventListener('click', () => {
+          closeMobileDrawer();
         });
       }
     }
