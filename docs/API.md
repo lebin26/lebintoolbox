@@ -270,5 +270,50 @@ Retrieves total system metrics (Users, Active/Suspended, Bills, Profit).
 - `DELETE /api/admin/users/:id`: Permanently delete a user account with safety checks and Audit Log.
 - `GET /api/admin/logs`: View admin audit trail.
 
+---
+
+## 5. Advance Manager API Endpoints (Sub-App: 垫付管理)
+
+All Advance Manager endpoints require standard Bearer token authentication (`Authorization: Bearer <token>`).
+
+### 1. Dashboard Overview
+- **Method**: `GET`
+- **Endpoint**: `/api/advancemanager/dashboard`
+- **Response (`200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "mePersonId": "p_me_123",
+      "totalAdvanced": 12000,
+      "totalSettled": 4000,
+      "totalOutstanding": 8000,
+      "iOweTotal": 0,
+      "netBalance": 8000,
+      "peopleWhoOwe": [{ "personId": "p_john", "name": "John", "amount": 8000 }],
+      "peopleIOwe": [],
+      "recentExpenses": [...],
+      "recentSettlements": [...]
+    }
+  }
+  ```
+
+### 2. Expenses CRUD
+- `GET /api/advancemanager/expenses`: Query expenses with filters (`search`, `status`, `person_id`, `limit`, `offset`).
+- `POST /api/advancemanager/expenses`: Create advance transaction with participants and integer cents.
+- `GET /api/advancemanager/expenses/:id`: Get expense details and participant shares.
+- `DELETE /api/advancemanager/expenses/:id`: Soft delete/cancel expense (`status = 'cancelled'`).
+
+### 3. Persons & Net Balances
+- `GET /api/advancemanager/persons`: List all contacts and calculated Net Balances.
+- `POST /api/advancemanager/persons`: Add a new person contact.
+- `PUT /api/advancemanager/persons/:id`: Update person or soft archive.
+- `GET /api/advancemanager/persons/:id`: Get person detail and historical pairwise ledger.
+
+### 4. Settlements
+- `GET /api/advancemanager/settlements`: List settlement history.
+- `POST /api/advancemanager/settlements`: Record repayment settlement between two persons.
+
+
 
 

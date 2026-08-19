@@ -9,6 +9,7 @@
     hub: 'OmniBox',
     courtledger: 'Court Ledger',
     historybills: 'History Bills',
+    advancemanager: 'Advance Manager',
     admin: 'Admin Dashboard'
   };
 
@@ -22,6 +23,7 @@
       hub: document.getElementById('view-hub'),
       courtledger: document.getElementById('view-courtledger'),
       historybills: document.getElementById('view-historybills'),
+      advancemanager: document.getElementById('view-advancemanager'),
       admin: document.getElementById('view-admin')
     };
 
@@ -90,7 +92,9 @@
 
       const hubHeaderActions = document.getElementById('hub-header-actions');
       const courtledgerHeaderActions = document.getElementById('courtledger-header-actions');
+      const advancemanagerHeaderActions = document.getElementById('advancemanager-header-actions');
       const adminMenuToggleBtn = document.getElementById('admin-menu-toggle-btn');
+      const amMenuToggleBtn = document.getElementById('am-menu-toggle-btn');
 
       if (hubHeaderActions) {
         hubHeaderActions.classList.toggle('hidden', targetViewId !== 'hub');
@@ -98,8 +102,14 @@
       if (courtledgerHeaderActions) {
         courtledgerHeaderActions.classList.toggle('hidden', targetViewId !== 'courtledger');
       }
+      if (advancemanagerHeaderActions) {
+        advancemanagerHeaderActions.classList.toggle('hidden', targetViewId !== 'advancemanager');
+      }
       if (adminMenuToggleBtn) {
         adminMenuToggleBtn.classList.toggle('hidden', targetViewId !== 'admin');
+      }
+      if (amMenuToggleBtn) {
+        amMenuToggleBtn.classList.toggle('hidden', targetViewId !== 'advancemanager');
       }
 
       if (targetViewId === 'courtledger') {
@@ -119,6 +129,10 @@
       } else if (targetViewId === 'admin') {
         if (window.AdminModule && typeof window.AdminModule.loadActiveTabData === 'function') {
           window.AdminModule.loadActiveTabData();
+        }
+      } else if (targetViewId === 'advancemanager') {
+        if (window.AdvanceManagerUI && typeof window.AdvanceManagerUI.loadInitialData === 'function') {
+          window.AdvanceManagerUI.loadInitialData();
         }
       }
 

@@ -119,6 +119,82 @@ During local development (`npm run dev`), Wrangler automatically manages a local
 
 ---
 
+### Table: `am_persons` (Advance Manager - 涉及人物)
+Stores contacts/persons involved in debt and advance transactions (isolated by `owner_user_id`).
+
+| Column | Type | Nullable | Primary Key | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | TEXT | NO | YES | Person UUID |
+| `owner_user_id` | TEXT | NO | NO | Owner user account ID |
+| `name` | TEXT | NO | NO | Person real name / display name |
+| `nickname` | TEXT | YES | NO | Optional nickname |
+| `phone` | TEXT | YES | NO | Phone number |
+| `email` | TEXT | YES | NO | Email address |
+| `avatar_url` | TEXT | YES | NO | Avatar URL |
+| `note` | TEXT | YES | NO | Relationship note |
+| `is_archived` | INTEGER | NO | NO | Soft archive flag (0/1) |
+| `created_at` | TEXT | NO | NO | ISO 8601 creation time |
+| `updated_at` | TEXT | NO | NO | ISO 8601 update time |
+
+---
+
+### Table: `am_expenses` (Advance Manager - 垫付主表)
+Stores main expense transaction details. All amounts stored as integer cents.
+
+| Column | Type | Nullable | Primary Key | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | TEXT | NO | YES | Expense UUID |
+| `owner_user_id` | TEXT | NO | NO | Owner user ID |
+| `transaction_date` | TEXT | NO | NO | Date/time of expense (ISO 8601) |
+| `description` | TEXT | NO | NO | Purpose / title of advance |
+| `total_amount` | INTEGER | NO | NO | Amount in minimum cents (e.g. 1250 = RM 12.50) |
+| `currency` | TEXT | NO | NO | Currency code (default `MYR`) |
+| `payer_person_id` | TEXT | NO | NO | FK to `am_persons.id` |
+| `category_id` | TEXT | YES | NO | FK to `am_categories.id` |
+| `project_id` | TEXT | YES | NO | FK to `am_projects.id` |
+| `payment_method` | TEXT | NO | NO | Payment method |
+| `status` | TEXT | NO | NO | Status (`unsettled`, `partial`, `settled`, `cancelled`) |
+| `note` | TEXT | YES | NO | Notes |
+| `created_at` | TEXT | NO | NO | Creation time |
+| `updated_at` | TEXT | NO | NO | Update time |
+
+---
+
+### Table: `am_expense_participants` (Advance Manager - 分摊明细)
+Stores individual split liability for each person per expense.
+
+| Column | Type | Nullable | Primary Key | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | TEXT | NO | YES | Participant record UUID |
+| `expense_id` | TEXT | NO | NO | FK to `am_expenses.id` |
+| `person_id` | TEXT | NO | NO | FK to `am_persons.id` |
+| `split_type` | TEXT | NO | NO | `equal`, `fixed`, `percentage` |
+| `share_amount` | INTEGER | NO | NO | Liability in cents |
+| `percentage` | REAL | YES | NO | Percentage if split_type = percentage |
+| `created_at` | TEXT | NO | NO | Creation timestamp |
+| `updated_at` | TEXT | NO | NO | Update timestamp |
+
+---
+
+### Table: `am_settlements` (Advance Manager - 还款平账结算)
+Records direct repayment transactions between two persons.
+
+| Column | Type | Nullable | Primary Key | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | TEXT | NO | YES | Settlement UUID |
+| `owner_user_id` | TEXT | NO | NO | Owner user ID |
+| `from_person_id` | TEXT | NO | NO | Debtor paying back (`am_persons.id`) |
+| `to_person_id` | TEXT | NO | NO | Creditor receiving (`am_persons.id`) |
+| `amount` | INTEGER | NO | NO | Repayment amount in cents |
+| `currency` | TEXT | NO | NO | Currency code (default `MYR`) |
+| `settlement_date` | TEXT | NO | NO | Settlement date/time (ISO 8601) |
+| `payment_method` | TEXT | NO | NO | Method of payment |
+| `note` | TEXT | YES | NO | Settlement remarks |
+| `created_at` | TEXT | NO | NO | Creation timestamp |
+| `updated_at` | TEXT | NO | NO | Update timestamp |
+
+---
+
 ## 4. Migration Rules & Process
 
 1. **Immutable Migrations**: Never modify an existing, applied migration file (such as `migrations/0001_create_venues.sql`).

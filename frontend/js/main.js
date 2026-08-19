@@ -62,7 +62,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.CourtLedgerQR.initQRSystem();
   }
 
-  console.log('OmniBox application initialized successfully! (Active App: Court Ledger)');
+  // 12. Advance Manager Sub-App
+  if (window.AdvanceManagerUI) {
+    window.AdvanceManagerUI.initAdvanceManagerUI();
+  }
+
+  console.log('OmniBox application initialized successfully! (Apps: Court Ledger, Advance Manager)');
 });
 
 function bindAuthPageControls() {
@@ -196,13 +201,35 @@ function bindAuthPageControls() {
     });
   }
 
-  // Settings Menu - Logout Buttons (inside Hub and Court Ledger settings)
+  // Settings Menu - Advance Manager Settings Button Toggle
+  const amSettingsBtn = document.getElementById('advancemanager-settings-btn');
+  const amSettingsDropdown = document.getElementById('advancemanager-settings-dropdown');
+  if (amSettingsBtn && amSettingsDropdown) {
+    amSettingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = amSettingsDropdown.classList.toggle('hidden');
+      amSettingsBtn.classList.toggle('active', !isHidden);
+    });
+
+    amSettingsDropdown.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    document.addEventListener('click', () => {
+      amSettingsDropdown.classList.add('hidden');
+      amSettingsBtn.classList.remove('active');
+    });
+  }
+
+  // Settings Menu - Logout Buttons (inside Hub, Court Ledger, and Advance Manager settings)
   document.querySelectorAll('.btn-logout').forEach(btn => {
     btn.addEventListener('click', () => {
       const settingsDropdown = document.getElementById('settings-dropdown');
       const clSettingsDropdown = document.getElementById('courtledger-settings-dropdown');
+      const amSettingsDropdown = document.getElementById('advancemanager-settings-dropdown');
       if (settingsDropdown) settingsDropdown.classList.add('hidden');
       if (clSettingsDropdown) clSettingsDropdown.classList.add('hidden');
+      if (amSettingsDropdown) amSettingsDropdown.classList.add('hidden');
 
       window.AuthManager.logout();
       if (window.CourtLedgerState && typeof window.CourtLedgerState.fetchBills === 'function') {

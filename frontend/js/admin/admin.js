@@ -19,14 +19,14 @@
   let activeTab = 'users';
 
   function initAdminUI() {
-    const tabBtns = document.querySelectorAll('.admin-tab-btn');
-    const tabPanels = document.querySelectorAll('.admin-tab-panel');
+    const tabBtns = document.querySelectorAll('#admin-sidebar .admin-tab-btn');
+    const tabPanels = document.querySelectorAll('#view-admin .admin-tab-panel');
     const adminSidebar = document.getElementById('admin-sidebar');
     const adminMobileBackdrop = document.getElementById('admin-mobile-backdrop');
     const headerMenuToggleBtn = document.getElementById('admin-menu-toggle-btn');
     const sidebarToggleBtn = document.getElementById('admin-sidebar-toggle-btn');
     const sidebarCloseBtn = document.getElementById('admin-sidebar-close-btn');
-    const adminLayoutWrapper = document.querySelector('.admin-layout-wrapper');
+    const adminLayoutWrapper = document.querySelector('#view-admin .admin-layout-wrapper');
 
     function isMobileView() {
       return window.innerWidth <= 820;

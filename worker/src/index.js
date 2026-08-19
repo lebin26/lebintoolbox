@@ -3,6 +3,8 @@
  * Includes Authentication, Unified User & Admin RBAC System, Cloudflare D1 integration, and Audit Logs.
  */
 
+import { handleAdvanceManagerRequest } from './advancemanager.js';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
@@ -145,6 +147,14 @@ export default {
             '/api/admin/dashboard'
           ]
         });
+      }
+
+      // -------------------------------------------------------------
+      // 0.1 ADVANCE MANAGER SUB-APP ENDPOINTS
+      // -------------------------------------------------------------
+      if (path.startsWith('/api/advancemanager')) {
+        const currentUser = await getAuthenticatedUser(request, env);
+        return await handleAdvanceManagerRequest(request, env, currentUser, path, method);
       }
 
       // -------------------------------------------------------------

@@ -68,6 +68,7 @@
   function updateGlobalAuthUI() {
     const hubUserInfo = document.getElementById('hub-user-info');
     const courtledgerUserInfo = document.getElementById('courtledger-user-info');
+    const advancemanagerUserInfo = document.getElementById('advancemanager-user-info');
     const courtledgerAdminSection = document.getElementById('courtledger-admin-settings-section');
 
     const isLoggedIn = !!currentUser && !!currentToken;
@@ -81,6 +82,7 @@
 
     if (hubUserInfo) hubUserInfo.innerHTML = userInfoHtml;
     if (courtledgerUserInfo) courtledgerUserInfo.innerHTML = userInfoHtml;
+    if (advancemanagerUserInfo) advancemanagerUserInfo.innerHTML = userInfoHtml;
 
     // 2. Hub Admin Console App Card (Visible FIRST on Hub if isAdmin)
     const hubAdminCard = document.getElementById('hub-admin-card');
