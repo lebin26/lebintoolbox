@@ -1,0 +1,258 @@
+# REST API Specification (`docs/API.md`)
+
+## Overview
+The API is implemented via Cloudflare Worker (`worker/src/index.js`) exposing RESTful JSON endpoints connected to Cloudflare D1 database.
+
+- **Base URL (Local)**: `http://127.0.0.1:8787` (or relative path `/api` via Vite dev server proxy)
+- **Base URL (Production)**: `https://hostcalculator-worker.lebin2626.workers.dev`
+- **Content-Type**: `application/json`
+- **CORS**: Enabled (`Access-Control-Allow-Origin: *`)
+
+---
+
+## Endpoints
+
+### 1. Get All Venues
+Retrieves all venue records sorted by ID ascending.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/venues`
+- **Authentication**: None required
+- **Request Parameters**: None
+
+#### Success Response (`200 OK`)
+```json
+{
+  "venues": [
+    {
+      "id": 1,
+      "name": "Sentul Sports Arena",
+      "rateMorning": 14.0,
+      "rateEvening": 28.0,
+      "updatedAt": "2026-08-19 01:00:00"
+    }
+  ]
+}
+```
+
+#### Error Response (`500 Internal Server Error`)
+```json
+{
+  "error": "Internal Worker Error: ..."
+}
+```
+
+---
+
+### 2. Create Venue
+Creates a new venue record in the database.
+
+- **Method**: `POST`
+- **Endpoint**: `/api/venues`
+- **Authentication**: None (Recommended: Admin header token in future)
+- **Request Body**:
+```json
+{
+  "name": "Puchong Sports Center",
+  "rateMorning": 15.0,
+  "rateEvening": 30.0
+}
+```
+
+#### Field Rules
+- `name` (string, required): Non-empty venue title. Must be unique.
+- `rateMorning` (number, required): Non-negative number.
+- `rateEvening` (number, required): Non-negative number.
+
+#### Success Response (`201 Created`)
+```json
+{
+  "message": "球场添加成功",
+  "venue": {
+    "id": 2,
+    "name": "Puchong Sports Center",
+    "rateMorning": 15.0,
+    "rateEvening": 30.0
+  }
+}
+```
+
+#### Error Response (`400 Bad Request`)
+```json
+{
+  "error": "球场名称不能为空"
+}
+```
+
+---
+
+### 3. Update Venue
+Updates an existing venue record.
+
+- **Method**: `PUT`
+- **Endpoint**: `/api/venues/:id`
+- **Path Parameters**: `id` (integer, required) - Venue ID
+- **Request Body**:
+```json
+{
+  "name": "Sentul Sports Arena (Renovated)",
+  "rateMorning": 16.0,
+  "rateEvening": 32.0
+}
+```
+
+#### Success Response (`200 OK`)
+```json
+{
+  "message": "球场更新成功",
+  "venue": {
+    "id": 1,
+    "name": "Sentul Sports Arena (Renovated)",
+    "rateMorning": 16.0,
+    "rateEvening": 32.0
+  }
+}
+```
+
+#### Error Response (`404 Not Found`)
+```json
+{
+  "error": "未找到指定球场"
+}
+```
+
+---
+
+### 4. Delete Venue
+Removes a venue record from the database.
+
+- **Method**: `DELETE`
+- **Endpoint**: `/api/venues/:id`
+- **Path Parameters**: `id` (integer, required) - Venue ID
+
+#### Success Response (`200 OK`)
+```json
+{
+  "message": "球场删除成功",
+  "id": 1
+}
+```
+
+#### Error Response (`404 Not Found`)
+```json
+{
+  "error": "未找到指定球场"
+}
+```
+
+---
+
+### 5. Get All Saved Bills
+Retrieves historical bill calculation records sorted by ID descending.
+
+- **Method**: `GET`
+- **Endpoint**: `/api/bills`
+
+#### Success Response (`200 OK`)
+```json
+{
+  "bills": [
+    {
+      "id": 1,
+      "title": "Sentul Sports Arena (08/19)",
+      "venueName": "Sentul Sports Arena",
+      "playerFee": 15.5,
+      "totalPlayers": 8,
+      "hostCount": 1,
+      "totalCost": 124.0,
+      "createdAt": "2026-08-19 10:00:00"
+    }
+  ]
+}
+```
+
+---
+
+### 6. Create Saved Bill
+Saves a calculation bill snapshot to Cloudflare D1.
+
+- **Method**: `POST`
+- **Endpoint**: `/api/bills`
+- **Request Body**:
+```json
+{
+  "title": "Sentul Sports Arena AA",
+  "venueName": "Sentul Sports Arena",
+  "startTime": 16,
+  "duration": 2,
+  "courtCount": 1,
+  "courtFee": 56.0,
+  "totalPlayers": 8,
+  "hostCount": 1,
+  "shuttlesUsed": 4,
+  "shuttlePrice": 84.0,
+  "additionalShuttles": 0,
+  "playerFee": 15.5,
+  "totalCost": 84.0,
+  "totalRevenue": 108.5,
+  "netProfit": 24.5
+}
+```
+
+#### Success Response (`201 Created`)
+```json
+{
+  "message": "账单保存成功",
+  "bill": { "id": 1, "title": "Sentul Sports Arena AA", ... }
+}
+```
+
+---
+
+### 7. Delete Saved Bill
+Removes a bill record from the database.
+
+- **Method**: `DELETE`
+- **Endpoint**: `/api/bills/:id`
+
+---
+
+## Auth & Admin System APIs
+
+### 8. User Registration
+Registers a new standard user account (`role = 'user'`, `status = 'active'`).
+
+- **Method**: `POST`
+- **Endpoint**: `/api/auth/register`
+- **Body**: `{ "email": "user@domain.com", "password": "UserPassword123!", "name": "Lebin" }`
+- **Response (`201 Created`)**: `{ "message": "注册成功", "user": { ... }, "token": "..." }`
+
+---
+
+### 9. User Login
+Authenticates a user or admin account and returns a Bearer Token.
+
+- **Method**: `POST`
+- **Endpoint**: `/api/auth/login`
+- **Body**: `{ "email": "admin@hostcalculator.com", "password": "AdminPassword123!" }`
+- **Response (`200 OK`)**: `{ "message": "登录成功", "user": { "id": 1, "role": "admin", "status": "active" }, "token": "..." }`
+
+---
+
+### 10. Admin Dashboard Analytics
+Retrieves total system metrics (Users, Active/Suspended, Bills, Profit).
+
+- **Method**: `GET`
+- **Endpoint**: `/api/admin/dashboard`
+- **Header**: `Authorization: Bearer <token>`
+- **Authorization**: Requires `user.role === 'admin'`. Otherwise returns `403 Forbidden`.
+
+---
+
+### 11. Admin User Management & Audit Logs
+- `GET /api/admin/users`: List users with search & filters.
+- `PATCH /api/admin/users/:id`: Update user role / status with Audit Log.
+- `POST /api/admin/users/:id/suspend`: Freeze user account.
+- `POST /api/admin/users/:id/activate`: Re-activate user account.
+- `GET /api/admin/logs`: View admin audit trail.
+

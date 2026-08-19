@@ -37,6 +37,7 @@
     }
 
     function setPage(pageIndex, velocity = 0) {
+      if (window.innerWidth >= 900) return;
       currentPage = pageIndex;
       const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (prefersReducedMotion) {
@@ -82,6 +83,7 @@
     }
 
     swipeViewport.addEventListener('pointerdown', (e) => {
+      if (window.innerWidth >= 900) return;
       if (
         e.target.closest('#duration-slider') ||
         e.target.closest('.drawer-sheet') ||
@@ -96,6 +98,10 @@
         e.target.closest('.stepper-wrapper') ||
         e.target.closest('.stepper-btn') ||
         e.target.closest('button') ||
+        e.target.closest('.modal-card') ||
+        e.target.closest('.modal-overlay') ||
+        e.target.closest('.modal-bills-list') ||
+        e.target.closest('.modal-venues-list') ||
         e.button !== 0
       ) {
         return;

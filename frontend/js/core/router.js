@@ -5,8 +5,11 @@
 
 (function () {
   const viewTitles = {
+    login: 'Account Login',
     hub: 'LEBIN_26',
-    courtledger: 'Court Ledger'
+    courtledger: 'Court Ledger',
+    historybills: 'History Bills',
+    admin: 'Admin Dashboard'
   };
 
   function initRouter() {
@@ -15,12 +18,39 @@
     const toggleViewBtn = document.getElementById('toggle-view-btn');
 
     const views = {
+      login: document.getElementById('view-login'),
       hub: document.getElementById('view-hub'),
-      courtledger: document.getElementById('view-courtledger')
+      courtledger: document.getElementById('view-courtledger'),
+      historybills: document.getElementById('view-historybills'),
+      admin: document.getElementById('view-admin')
     };
 
+    let currentActiveViewId = 'hub';
+    let previousViewId = 'hub';
+
     function switchView(targetViewId, updateHash = true) {
-      if (!views[targetViewId]) targetViewId = 'hub';
+      // 1. Auth Navigation Guard
+      const isLoggedIn = window.AuthManager && window.AuthManager.isLoggedIn;
+      const isAdmin = window.AuthManager && window.AuthManager.isAdmin;
+
+      if (!isLoggedIn && targetViewId !== 'login') {
+        targetViewId = 'login';
+      } else if (isLoggedIn && targetViewId === 'login') {
+        targetViewId = 'hub';
+      }
+
+      if (targetViewId === 'admin' && !isAdmin) {
+        if (typeof window.showToast === 'function') {
+          window.showToast('⛔ 权限不足：仅管理员允许访问后台');
+        }
+        targetViewId = 'hub';
+      }
+
+      if (!views[targetViewId]) targetViewId = isLoggedIn ? 'hub' : 'login';
+      if (currentActiveViewId !== targetViewId) {
+        previousViewId = currentActiveViewId;
+      }
+      currentActiveViewId = targetViewId;
 
       Object.keys(views).forEach(vKey => {
         const vEl = views[vKey];
@@ -41,10 +71,20 @@
       }
 
       if (backToHubBtn) {
-        if (targetViewId === 'hub') {
+        if (targetViewId === 'hub' || targetViewId === 'login') {
           backToHubBtn.classList.add('hidden');
         } else {
           backToHubBtn.classList.remove('hidden');
+          const btnText = backToHubBtn.querySelector('.btn-text');
+          if (btnText) {
+            if (targetViewId === 'historybills') {
+              btnText.textContent = 'Court Ledger';
+            } else if (targetViewId === 'admin') {
+              btnText.textContent = previousViewId === 'courtledger' ? 'Court Ledger' : 'Tools';
+            } else {
+              btnText.textContent = 'Back';
+            }
+          }
         }
       }
 
@@ -56,6 +96,16 @@
       }
       if (courtledgerHeaderActions) {
         courtledgerHeaderActions.classList.toggle('hidden', targetViewId !== 'courtledger');
+      }
+
+      if (targetViewId === 'historybills') {
+        if (window.CourtLedgerUI && typeof window.CourtLedgerUI.renderBillsList === 'function') {
+          window.CourtLedgerUI.renderBillsList();
+        }
+      } else if (targetViewId === 'admin') {
+        if (window.AdminModule && typeof window.AdminModule.loadActiveTabData === 'function') {
+          window.AdminModule.loadActiveTabData();
+        }
       }
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -73,7 +123,13 @@
 
     if (backToHubBtn) {
       backToHubBtn.addEventListener('click', () => {
-        switchView('hub');
+        if (currentActiveViewId === 'historybills') {
+          switchView('courtledger');
+        } else if (currentActiveViewId === 'admin') {
+          switchView(previousViewId === 'courtledger' ? 'courtledger' : 'hub');
+        } else {
+          switchView('hub');
+        }
       });
     }
 
@@ -99,8 +155,9 @@
     window.addEventListener('hashchange', handleHashRoute);
     handleHashRoute();
 
+    window.AppRouter.switchView = switchView;
     return { switchView };
   }
 
-  window.AppRouter = { initRouter, viewTitles };
+  window.AppRouter = { initRouter, viewTitles, switchView: null };
 })();

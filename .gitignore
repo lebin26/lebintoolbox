@@ -1,10 +1,13 @@
 # Dependencies
 node_modules/
 package-lock.json
+.vite/
 
 # Cloudflare Wrangler, Logs & Local dev database
 .wrangler/
 data/
+backups/
+dump_*.sql
 *.sqlite
 *.log
 .env

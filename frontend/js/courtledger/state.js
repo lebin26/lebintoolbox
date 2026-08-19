@@ -15,9 +15,9 @@
   function getApiBaseUrl() {
     if (window.WORKER_API_URL) return window.WORKER_API_URL.replace(/\/$/, '');
 
-    // Auto-detect local testing environment
+    // Auto-detect local testing environment (use relative endpoint to leverage Vite proxy)
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return 'http://localhost:8787';
+      return '';
     }
 
     // Default production Cloudflare Worker API endpoint
@@ -27,9 +27,9 @@
   function getActiveRates() {
     const v = venues[selectedVenueIndex] || venues[0];
     return {
-      venueName: v ? v.name : '标准场地',
-      rateMorning: v ? (typeof v.rateMorning === 'number' ? v.rateMorning : parseFloat(v.rateMorning)) : 14.84,
-      rateEvening: v ? (typeof v.rateEvening === 'number' ? v.rateEvening : parseFloat(v.rateEvening)) : 29.68
+      venueName: v ? v.name : '球场库为空',
+      rateMorning: v ? (typeof v.rateMorning === 'number' ? v.rateMorning : parseFloat(v.rateMorning)) : 0,
+      rateEvening: v ? (typeof v.rateEvening === 'number' ? v.rateEvening : parseFloat(v.rateEvening)) : 0
     };
   }
 
@@ -92,8 +92,9 @@
 
     populateVenueSelect();
 
-    // Fetch venues directly from Cloudflare D1 Database API
+    // Fetch venues and bills directly from Cloudflare D1 Database API & local storage
     await fetchVenuesFromDatabase();
+    await fetchBills();
 
     if (venueSelect) {
       venueSelect.addEventListener('change', () => {
@@ -187,8 +188,153 @@
     }
   }
 
+  let savedBills = [];
+
+  const LOCAL_BILLS_KEY = 'courtledger_saved_bills';
+
+  function getLocalBills() {
+    const keys = ['courtledger_saved_bills', 'courtledger_bills', 'courtledger_history_bills', 'bills_history'];
+    const merged = [];
+    const seen = new Set();
+    keys.forEach(k => {
+      try {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            list.forEach(item => {
+              if (item) {
+                const keyStr = item.id ? String(item.id) : (item.title + '_' + (item.createdAt || ''));
+                if (!seen.has(keyStr)) {
+                  seen.add(keyStr);
+                  merged.push(item);
+                }
+              }
+            });
+          }
+        }
+      } catch (e) {}
+    });
+    return merged;
+  }
+
+  function saveLocalBills(list) {
+    try {
+      localStorage.setItem(LOCAL_BILLS_KEY, JSON.stringify(list));
+    } catch (e) {}
+  }
+
+  async function fetchBills() {
+    let apiBills = [];
+    try {
+      const endpoint = getApiBaseUrl() + '/api/bills';
+      const response = await fetch(endpoint);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && Array.isArray(data.bills)) {
+          apiBills = data.bills;
+        }
+      }
+    } catch (err) {
+      console.warn('⚠️ Cloudflare Worker API bills fetch failed, using local storage:', err.message);
+    }
+
+    const localBills = getLocalBills();
+    const billMap = new Map();
+
+    localBills.forEach((b, idx) => {
+      if (b) {
+        const idKey = (b.id !== undefined && b.id !== null && String(b.id).trim() !== '') ? String(b.id) : `local_${idx}_${Date.now()}`;
+        if (!b.id) b.id = idKey;
+        billMap.set(idKey, b);
+      }
+    });
+
+    apiBills.forEach((b, idx) => {
+      if (b) {
+        const idKey = (b.id !== undefined && b.id !== null && String(b.id).trim() !== '') ? String(b.id) : `api_${idx}_${Date.now()}`;
+        if (!b.id) b.id = idKey;
+        billMap.set(idKey, b);
+      }
+    });
+
+    savedBills = Array.from(billMap.values());
+    savedBills.sort((a, b) => {
+      const tA = a.createdAt ? new Date(String(a.createdAt).replace(' ', 'T')).getTime() : 0;
+      const tB = b.createdAt ? new Date(String(b.createdAt).replace(' ', 'T')).getTime() : 0;
+      return tB - tA;
+    });
+
+    saveLocalBills(savedBills);
+    return savedBills;
+  }
+
+  async function saveBill(billData) {
+    let newBill = null;
+    try {
+      const endpoint = getApiBaseUrl() + '/api/bills';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(billData)
+      });
+      const data = await response.json();
+      if (response.ok && data.bill) {
+        newBill = data.bill;
+      }
+    } catch (err) {
+      console.warn('⚠️ Failed to save bill to Cloudflare Worker API, storing locally:', err.message);
+    }
+
+    if (!newBill) {
+      newBill = {
+        ...billData,
+        id: Date.now(),
+        createdAt: new Date().toISOString()
+      };
+    }
+
+    savedBills.unshift(newBill);
+    saveLocalBills(savedBills);
+    return newBill;
+  }
+
+  async function updateBill(id, billData) {
+    try {
+      const endpoint = getApiBaseUrl() + `/api/bills/${id}`;
+      await fetch(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(billData)
+      });
+    } catch (err) {
+      console.warn('⚠️ Update bill to worker failed, fallback to local storage:', err.message);
+    }
+
+    const idx = savedBills.findIndex(b => String(b.id) === String(id));
+    if (idx !== -1) {
+      savedBills[idx] = { ...savedBills[idx], ...billData, updatedAt: new Date().toISOString() };
+      saveLocalBills(savedBills);
+    }
+    return true;
+  }
+
+  async function deleteBill(id) {
+    try {
+      const endpoint = getApiBaseUrl() + `/api/bills/${id}`;
+      await fetch(endpoint, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('⚠️ Delete bill on worker failed, fallback to local storage:', err.message);
+    }
+
+    savedBills = savedBills.filter(b => String(b.id) !== String(id));
+    saveLocalBills(savedBills);
+    return true;
+  }
+
   window.CourtLedgerState = {
     get venues() { return venues; },
+    get savedBills() { return savedBills; },
     getActiveRates,
     updateActiveVenueRates,
     populateVenueSelect,
@@ -196,6 +342,10 @@
     fetchVenuesFromDatabase,
     addVenue,
     updateVenue,
-    deleteVenue
+    deleteVenue,
+    fetchBills,
+    saveBill,
+    updateBill,
+    deleteBill
   };
 })();

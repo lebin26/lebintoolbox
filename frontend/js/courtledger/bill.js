@@ -17,18 +17,9 @@
     '📌 *付款请划到第二页扫 QR 码，谢谢！*';
 
   function showToast(message) {
-    let toast = document.getElementById('copy-toast');
-    if (!toast) {
-      toast = document.createElement('div');
-      toast.id = 'copy-toast';
-      toast.className = 'toast';
-      document.body.appendChild(toast);
+    if (typeof window.showToast === 'function') {
+      window.showToast(message);
     }
-    toast.innerHTML = `<span class="toast-icon">✨</span><span class="toast-msg">${message}</span>`;
-    toast.classList.add('show');
-    setTimeout(() => {
-      toast.classList.remove('show');
-    }, 2000);
   }
 
   function fallbackCopyText(text) {
@@ -55,11 +46,11 @@
       if (successful) {
         showToast("账单已成功复制到剪贴板！");
       } else {
-        alert("复制失败，请手动选择复制。");
+        showToast("复制失败，请手动选择复制。");
       }
     } catch (err) {
       console.error('Fallback copy failed: ', err);
-      alert("复制失败，请手动选择复制。");
+      showToast("复制失败，请手动选择复制。");
     }
     document.body.removeChild(textArea);
   }

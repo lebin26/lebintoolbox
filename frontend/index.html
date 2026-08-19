@@ -19,13 +19,6 @@
 </head>
 
 <body>
-  <!-- Ambient Liquid Glassmorphism Background -->
-  <div class="liquid-bg">
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
-    <div class="blob blob-3"></div>
-  </div>
-
   <div class="app-container">
     <!-- Top Bar with Navigation & Global Settings -->
     <header class="tv-header">
@@ -37,13 +30,24 @@
         <span id="header-app-title" class="tv-title">Tools</span>
       </div>
       <div class="tv-header-actions">
-        <!-- 1. Hub View Header Actions (主页专属设置: 主题模式) -->
-        <div id="hub-header-actions" class="view-header-actions">
+        <!-- 1. Hub View Header Actions (主页专属设置: 账号信息 + 主题模式) -->
+        <div id="hub-header-actions" class="view-header-actions hidden">
           <div class="settings-container">
-            <button id="settings-btn" class="tv-btn-settings" title="主页外观设置">
+            <button id="settings-btn" class="tv-btn-settings" title="主页设置">
               <span class="btn-icon">⚙️</span>
             </button>
             <div id="settings-dropdown" class="settings-dropdown hidden">
+              <!-- Account Section inside Hub Settings -->
+              <div class="settings-section">
+                <div class="settings-section-title">当前账号</div>
+                <div id="hub-user-info" style="padding: 4px 8px; font-size: 0.85rem; color: var(--color-text-muted);">
+                  <!-- Dynamic user info -->
+                </div>
+                <button type="button" class="dropdown-action-btn danger-text btn-logout" style="margin-top:6px; width:100%; cursor:pointer;">
+                  🚪 退出登录
+                </button>
+              </div>
+
               <!-- Theme Selection -->
               <div class="settings-section">
                 <div class="settings-section-title">切换显示模式</div>
@@ -66,26 +70,53 @@
           </div>
         </div>
 
-        <!-- 2. Court Ledger View Header Actions (先 QR 按钮，后设置按钮) -->
+        <!-- 2. Court Ledger View Header Actions (QR 按钮 + Court Ledger 设置) -->
         <div id="courtledger-header-actions" class="view-header-actions hidden">
-          <!-- 1. QR 按钮 -->
+          <!-- QR 按钮 -->
           <button id="toggle-view-btn" class="tv-btn-toggle" title="Toggle View">
             <span class="btn-icon">📱</span>
             <span class="btn-text">QR</span>
           </button>
 
-          <!-- 2. Court Ledger 设置按钮 & 下拉菜单 -->
+          <!-- Court Ledger 设置按钮 & 下拉菜单 -->
           <div class="settings-container">
             <button id="courtledger-settings-btn" class="tv-btn-settings" title="Court Ledger 设置">
               <span class="btn-icon">⚙️</span>
             </button>
             <div id="courtledger-settings-dropdown" class="settings-dropdown hidden">
+              <!-- Account Section inside Court Ledger Settings -->
+              <div class="settings-section">
+                <div class="settings-section-title">当前账号</div>
+                <div id="courtledger-user-info" style="padding: 4px 8px; font-size: 0.85rem; color: var(--color-text-muted);">
+                  <!-- Dynamic user info -->
+                </div>
+                <button type="button" class="dropdown-action-btn danger-text btn-logout" style="margin-top:6px; width:100%; cursor:pointer;">
+                  🚪 退出登录
+                </button>
+              </div>
+
+              <!-- Court Ledger Tools -->
               <div class="settings-section">
                 <div class="settings-section-title">Court Ledger 设置</div>
                 <div class="settings-menu-list">
                   <button type="button" class="settings-menu-item" id="menu-manage-venues">
                     <span class="opt-icon">🏸</span>
                     <span class="opt-text">球场数据库管理</span>
+                  </button>
+                  <button type="button" class="settings-menu-item" id="menu-history-bills">
+                    <span class="opt-icon">📜</span>
+                    <span class="opt-text">历史账单记录</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Admin User Management in Court Ledger ONLY (Visible ONLY if isAdmin) -->
+              <div id="courtledger-admin-settings-section" class="settings-section hidden">
+                <div class="settings-section-title">系统管理</div>
+                <div class="settings-menu-list">
+                  <button type="button" class="settings-menu-item" id="menu-courtledger-admin-users">
+                    <span class="opt-icon">👥</span>
+                    <span class="opt-text">用户管理后台</span>
                   </button>
                 </div>
               </div>
@@ -101,6 +132,21 @@
       <!-- VIEW 1: TOOLBOX HUB (Categorized View: views/hub.html) -->
       <div id="view-hub" class="app-view active">
         <section class="shortcuts-grid" id="tool-grid">
+          <!-- Admin Console Card (First app card, visible ONLY for admin account) -->
+          <div id="hub-admin-card" class="shortcut-card shortcut-purple hidden" data-target-view="admin">
+            <div class="shortcut-top">
+              <div class="shortcut-icon-circle">
+                <span class="shortcut-icon">👑</span>
+              </div>
+              <span class="shortcut-pill-badge">ADMIN</span>
+            </div>
+            <div class="shortcut-bottom">
+              <h2 class="shortcut-title">Admin Console</h2>
+              <span class="shortcut-subtitle">系统控制台与用户权限管理</span>
+            </div>
+          </div>
+
+          <!-- Court Ledger Card -->
           <div class="shortcut-card shortcut-purple" data-target-view="courtledger">
             <div class="shortcut-top">
               <div class="shortcut-icon-circle">
@@ -120,16 +166,16 @@
       <div id="view-courtledger" class="app-view hidden">
         <div class="calculator-card">
 
-          <!-- Fixed Section: 每人收费 Display -->
-          <section class="ticker-section">
+          <!-- Mobile Only Ticker (Hidden on Desktop) -->
+          <section class="ticker-section mobile-only-ticker">
             <div class="ticker-label">每人收费</div>
             <div class="ticker-price-container">
               <span class="ticker-currency currency-unit">RM</span>
-              <span id="player-fee-display" class="ticker-price">0.00</span>
+              <span id="player-fee-display" class="ticker-price player-fee-val">0.00</span>
             </div>
           </section>
 
-          <!-- Swipe Viewport -->
+          <!-- Swipe Viewport (Mobile Carousel / Desktop Live Studio) -->
           <div class="swipe-viewport">
             <div class="swipe-track" id="swipe-track">
 
@@ -299,58 +345,92 @@
 
                 </section>
 
-                <section class="outputs-section">
-                  <div class="shuttle-summary-card">
-                    <div class="shuttle-summary-title">🏸 用球统计明细</div>
-                    <div class="shuttle-summary-grid">
-                      <div class="shuttle-summary-item">
-                        <span class="item-label">真实用球</span>
-                        <span id="sum-actual-shuttles" class="item-val">0 个</span>
-                      </div>
-                      <div class="shuttle-summary-item">
-                        <span class="item-label">Cover用球</span>
-                        <span id="sum-cover-shuttles" class="item-val tag-blue">0 个</span>
-                      </div>
-                      <div class="shuttle-summary-item">
-                        <span class="item-label">盈利用球</span>
-                        <span id="sum-profit-shuttles" class="item-val tag-green">0 个</span>
-                      </div>
-                      <div class="shuttle-summary-item">
-                        <span class="item-label">被计算总用球</span>
-                        <span id="sum-billed-shuttles" class="item-val tag-accent">0 个</span>
-                      </div>
+                <!-- Studio Right Panel on Desktop / Inline Section on Mobile -->
+                <div class="studio-sidepanel" id="courtledger-sidepanel">
+                  <!-- Desktop Sticky Ticker (Hidden on Mobile) -->
+                  <div class="desktop-ticker-card">
+                    <div class="ticker-label">每人收费 (实时平摊)</div>
+                    <div class="ticker-price-container">
+                      <span class="ticker-currency currency-unit">RM</span>
+                      <span id="player-fee-display-desktop" class="ticker-price player-fee-val">0.00</span>
                     </div>
                   </div>
 
-                  <div class="summary-row">
-                    <span class="summary-label">真实总成本</span>
-                    <div class="summary-value-wrapper">
-                      <span class="summary-currency currency-unit">RM</span>
-                      <span id="total-cost-display" class="summary-value">0.00</span>
+                  <section class="outputs-section">
+                    <div class="shuttle-summary-card">
+                      <div class="shuttle-summary-title">🏸 用球统计明细</div>
+                      <div class="shuttle-summary-grid">
+                        <div class="shuttle-summary-item">
+                          <span class="item-label">真实用球</span>
+                          <span id="sum-actual-shuttles" class="item-val">0 个</span>
+                        </div>
+                        <div class="shuttle-summary-item">
+                          <span class="item-label">Cover用球</span>
+                          <span id="sum-cover-shuttles" class="item-val tag-blue">0 个</span>
+                        </div>
+                        <div class="shuttle-summary-item">
+                          <span class="item-label">盈利用球</span>
+                          <span id="sum-profit-shuttles" class="item-val tag-green">0 个</span>
+                        </div>
+                        <div class="shuttle-summary-item">
+                          <span class="item-label">被计算总用球</span>
+                          <span id="sum-billed-shuttles" class="item-val tag-accent">0 个</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="summary-row">
+                      <span class="summary-label">真实总成本</span>
+                      <div class="summary-value-wrapper">
+                        <span class="summary-currency currency-unit">RM</span>
+                        <span id="total-cost-display" class="summary-value">0.00</span>
+                      </div>
+                    </div>
+
+                    <div class="summary-row">
+                      <span class="summary-label">总收款 (付费玩家)</span>
+                      <div class="summary-value-wrapper">
+                        <span class="summary-currency currency-unit">RM</span>
+                        <span id="total-revenue-display" class="summary-value">0.00</span>
+                      </div>
+                    </div>
+
+                    <div id="profit-row" class="summary-row profit-highlight">
+                      <span class="summary-label">净利润 (盈利)</span>
+                      <div class="summary-value-wrapper">
+                        <span class="summary-currency currency-unit">RM</span>
+                        <span id="net-profit-display" class="summary-value">0.00</span>
+                      </div>
+                    </div>
+                  </section>
+
+                  <!-- Desktop Live QR Card (Hidden on Mobile) -->
+                  <div class="desktop-qr-card">
+                    <div class="desktop-qr-header">
+                      <span class="qr-card-title">📱 DuitNow 收款码</span>
+                      <span class="qr-card-tag">扫码即付</span>
+                    </div>
+                    <div class="desktop-qr-wrapper">
+                      <img src="assets/duitnow-qr.png" alt="收款二维码" class="desktop-qr-image">
                     </div>
                   </div>
 
-                  <div class="summary-row">
-                    <span class="summary-label">总收款 (付费玩家)</span>
-                    <div class="summary-value-wrapper">
-                      <span class="summary-currency currency-unit">RM</span>
-                      <span id="total-revenue-display" class="summary-value">0.00</span>
-                    </div>
+                  <!-- Bill Action Buttons (Copy, Save, History) -->
+                  <div class="bill-actions-row">
+                    <button id="copy-bill-btn" class="copy-bill-btn">
+                      <span class="btn-icon">📋</span>
+                      <span class="btn-text">复制账单</span>
+                    </button>
+                    <button id="save-bill-btn" class="save-bill-btn">
+                      <span class="btn-icon">💾</span>
+                      <span class="btn-text">保存账单</span>
+                    </button>
+                    <button id="history-bill-btn" class="history-bill-btn">
+                      <span class="btn-icon">📜</span>
+                      <span class="btn-text">历史账单</span>
+                    </button>
                   </div>
-
-                  <div id="profit-row" class="summary-row profit-highlight">
-                    <span class="summary-label">净利润 (盈利)</span>
-                    <div class="summary-value-wrapper">
-                      <span class="summary-currency currency-unit">RM</span>
-                      <span id="net-profit-display" class="summary-value">0.00</span>
-                    </div>
-                  </div>
-                </section>
-
-                <button id="copy-bill-btn" class="copy-bill-btn">
-                  <span class="btn-icon">📋</span>
-                  <span class="btn-text">复制账单明细</span>
-                </button>
+                </div>
 
                 <div id="error-banner" class="error-banner hidden">
                   <span class="error-icon">⚠️</span>
@@ -358,8 +438,8 @@
                 </div>
               </div>
 
-              <!-- Slide 2: QR Code page -->
-              <div class="swipe-slide" id="slide-qr">
+              <!-- Slide 2: QR Code page (Mobile Only) -->
+              <div class="swipe-slide mobile-only-slide" id="slide-qr">
                 <div class="qr-container">
                   <div class="qr-title">QR</div>
                   <div class="qr-image-wrapper">
@@ -372,11 +452,321 @@
             </div>
           </div>
 
-          <div class="page-indicators">
+          <div class="page-indicators mobile-only-indicators">
             <span class="indicator-dot active" data-page="0"></span>
             <span class="indicator-dot" data-page="1"></span>
           </div>
 
+        </div>
+      </div>
+
+      <!-- VIEW 3: HISTORY BILLS DATABASE (Categorized View: views/historybills.html) -->
+      <div id="view-historybills" class="app-view hidden">
+        <div class="calculator-card history-page-card">
+
+          <div class="history-page-header">
+            <div>
+              <h2 class="history-page-title">📊 AA 账单历史数据库</h2>
+              <span class="db-status-badge">⚡ Cloudflare D1 云端数据库 + 本地存储双同步</span>
+            </div>
+          </div>
+
+          <!-- Analytics KPI Summary Grid -->
+          <div class="kpi-dashboard-grid">
+            <div class="kpi-card">
+              <span class="kpi-label">📁 账单总条数</span>
+              <span id="kpi-total-bills" class="kpi-value">0 笔</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">💰 累计总收款</span>
+              <span id="kpi-total-revenue" class="kpi-value">RM 0.00</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">📈 累计净利润</span>
+              <span id="kpi-total-profit" class="kpi-value tag-bullish">RM 0.00</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">🏸 场均每人收费</span>
+              <span id="kpi-avg-player-fee" class="kpi-value tag-accent">RM 0.00</span>
+            </div>
+          </div>
+
+          <!-- Search and Filter Bar -->
+          <div class="bills-list-container">
+            <div class="bills-list-header">
+              <input type="text" id="bills-search-input" placeholder="🔍 搜索账单名称、球场或日期..." class="modal-input">
+              <select id="bills-date-filter" class="modal-select date-filter-select">
+                <option value="all">📅 全部时间范围</option>
+                <option value="7">📅 近 7 天账单</option>
+                <option value="30">📅 近 30 天账单</option>
+                <option value="90">📅 近 90 天账单</option>
+                <option value="365">📅 近 1 年账单</option>
+              </select>
+            </div>
+            <div id="modal-bills-list" class="modal-bills-list page-bills-list">
+              <!-- 动态渲染历史账单列表 -->
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- VIEW 0: LOGIN & REGISTER VIEW -->
+      <!-- ========================================== -->
+      <div id="view-login" class="app-view login-view-container hidden">
+        <div class="login-card">
+          <div class="login-header">
+            <div class="login-badge">🛡️ 统一账号与 RBAC 鉴权系统</div>
+            <h2 class="login-title">欢迎登录 HostCalculator</h2>
+            <p class="login-subtitle">一个账号，即可使用羽球账单计算器与系统管理后台</p>
+          </div>
+
+          <!-- Auth Tab Switcher -->
+          <div class="auth-tabs">
+            <button type="button" id="tab-btn-login" class="auth-tab-btn active">登录账号</button>
+            <button type="button" id="tab-btn-register" class="auth-tab-btn">注册新账号</button>
+          </div>
+
+          <!-- Login Form -->
+          <form id="auth-login-form" class="auth-form">
+            <div class="form-group">
+              <label for="login-email">账号 (用户名 / 邮箱 Username or Email)</label>
+              <input type="text" id="login-email" class="modal-input" placeholder="例如: admin_lebin 或 admin@hostcalculator.com" required>
+            </div>
+            <div class="form-group">
+              <label for="login-password">登录密码 Password</label>
+              <input type="password" id="login-password" class="modal-input" placeholder="••••••••" required>
+            </div>
+            <div class="form-actions">
+              <button type="submit" id="btn-submit-login" class="btn-primary-block">🔑 立即登录</button>
+            </div>
+          </form>
+
+          <!-- Register Form -->
+          <form id="auth-register-form" class="auth-form hidden">
+            <div class="form-group">
+              <label for="reg-name">用户名 Username (3-20位，无空格)</label>
+              <input type="text" id="reg-name" class="modal-input" placeholder="例如: lebin26 (支持中英文/数字/下划线)" required>
+            </div>
+            <div class="form-group">
+              <label for="reg-email">电子邮箱 Email</label>
+              <input type="email" id="reg-email" class="modal-input" placeholder="user@domain.com" required>
+            </div>
+            <div class="form-group">
+              <label for="reg-password">设置密码 Password (至少 6 位)</label>
+              <input type="password" id="reg-password" class="modal-input" placeholder="••••••••" required>
+            </div>
+            <div class="form-actions">
+              <button type="submit" id="btn-submit-register" class="btn-primary-block">✨ 注册新账号</button>
+            </div>
+          </form>
+
+          <!-- Quick Test Account Credentials Tip -->
+          <div class="test-accounts-tip">
+            <div class="tip-title">⚡ 快速测试演示账号 (支持用户名 / 邮箱登录)：</div>
+            <div class="tip-credentials">
+              <div><strong>管理员 Admin:</strong> <code>admin_lebin</code> / <code>admin@hostcalculator.com</code> (密码: <code>AdminPassword123!</code>)</div>
+              <div><strong>普通用户 User:</strong> <code>test_user</code> / <code>user@hostcalculator.com</code> (密码: <code>UserPassword123!</code>)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- VIEW 4: ADMIN DASHBOARD & SYSTEM MANAGEMENT -->
+      <!-- ========================================== -->
+      <div id="view-admin" class="app-view admin-view-container hidden">
+        <div class="admin-dashboard-card">
+          <div class="admin-header-banner">
+            <div>
+              <h2 class="admin-page-title">👑 Admin 系统后台控制中心</h2>
+              <span class="db-status-badge">⚡ Cloudflare Worker RBAC & D1 Database Protection</span>
+            </div>
+          </div>
+
+          <!-- Admin Navigation Tabs: Clean Segmented Tab Control -->
+          <div class="admin-tabs-bar">
+            <button type="button" class="admin-tab-btn active" data-tab="users">👥 用户信息管理</button>
+            <button type="button" class="admin-tab-btn" data-tab="app-courtledger">🏸 Court Ledger 后台</button>
+            <button type="button" class="admin-tab-btn" data-tab="logs">📜 审计操作日志</button>
+          </div>
+
+          <!-- Tab 1: Users Management (用户信息管理 - 独立用户数据与状态管理) -->
+          <div id="admin-tab-users" class="admin-tab-panel">
+            <!-- User Stats KPI Grid -->
+            <div class="kpi-grid admin-kpi-grid" style="margin-bottom: var(--space-4);">
+              <div class="kpi-card">
+                <span class="kpi-label">注册用户总数</span>
+                <span id="admin-stat-total-users" class="kpi-value">0 人</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-label">正常活跃用户</span>
+                <span id="admin-stat-active-users" class="kpi-value tag-bullish">0 人</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-label">已冻结停用用户</span>
+                <span id="admin-stat-suspended-users" class="kpi-value tag-bearish">0 人</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-label">管理员人数</span>
+                <span id="admin-stat-admin-users" class="kpi-value tag-accent">0 人</span>
+              </div>
+            </div>
+
+            <div class="admin-toolbar">
+              <input type="text" id="admin-user-search" class="modal-input" placeholder="🔍 搜索用户名字或邮箱...">
+              <select id="admin-role-filter" class="modal-select date-filter-select">
+                <option value="all">所有角色 Role</option>
+                <option value="user">Standard User</option>
+                <option value="admin">Administrator</option>
+              </select>
+              <select id="admin-status-filter" class="modal-select date-filter-select">
+                <option value="all">所有状态 Status</option>
+                <option value="active">🟢 正常 (Active)</option>
+                <option value="suspended">🔴 已冻结 (Suspended)</option>
+              </select>
+            </div>
+
+            <div class="admin-table-wrapper">
+              <table class="admin-data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>用户</th>
+                    <th>邮箱</th>
+                    <th>设置密码 (Password)</th>
+                    <th>角色权限 (Role)</th>
+                    <th>状态 (Status)</th>
+                    <th>注册时间</th>
+                    <th>最近登录</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-users-tbody">
+                  <!-- Dynamic user list -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tab 3: Court Ledger App Backend (每个 App 专属后台) -->
+          <div id="admin-tab-app-courtledger" class="admin-tab-panel hidden">
+            <div class="admin-app-backend-header">
+              <div class="app-badge-title">
+                <span class="app-icon">🏸</span>
+                <div>
+                  <h3 class="app-title">Court Ledger 后台控制中心</h3>
+                  <p class="app-desc">独立管理羽毛球账单计算器的球场数据库与全站历史账单数据</p>
+                </div>
+              </div>
+              <div class="app-actions">
+                <button type="button" class="btn-primary-action" id="admin-btn-open-courtledger" style="flex:unset; padding: 6px 14px; font-size:0.85rem;">
+                  🏸 进入 Court Ledger
+                </button>
+              </div>
+            </div>
+
+            <!-- Court Ledger KPI Grid -->
+            <div class="kpi-grid admin-kpi-grid" style="margin-bottom: var(--space-4);">
+              <div class="kpi-card">
+                <span class="kpi-label">已配置球场数</span>
+                <span id="admin-cl-total-venues" class="kpi-value">0 间</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-label">历史账单总数</span>
+                <span id="admin-cl-total-bills" class="kpi-value">0 笔</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-label">累计营业收入</span>
+                <span id="admin-cl-total-revenue" class="kpi-value tag-bullish">RM 0.00</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-label">累计净利润</span>
+                <span id="admin-cl-total-profit" class="kpi-value tag-accent">RM 0.00</span>
+              </div>
+            </div>
+
+            <!-- Modular Sections Grid -->
+            <div class="admin-app-sections-grid">
+              <!-- Section 1: Venue Database Management -->
+              <div class="admin-app-section-card">
+                <div class="section-card-header">
+                  <div class="section-card-title">
+                    <span>🏸</span> 球场定价与数据库管理
+                  </div>
+                  <button type="button" class="btn-icon-sm" id="admin-btn-manage-venues-modal">
+                    ⚙️ 数据库弹窗管理
+                  </button>
+                </div>
+                <div class="admin-table-wrapper" style="max-height: 240px; overflow-y: auto;">
+                  <table class="admin-data-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>球场名称</th>
+                        <th>早场单价 (RM/h)</th>
+                        <th>晚场单价 (RM/h)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="admin-cl-venues-tbody">
+                      <!-- Dynamic Venues List -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Section 2: Recent Bills Management -->
+              <div class="admin-app-section-card">
+                <div class="section-card-header">
+                  <div class="section-card-title">
+                    <span>📜</span> 全站最新账单流水
+                  </div>
+                  <button type="button" class="btn-icon-sm" id="admin-btn-view-all-bills">
+                    📊 完整历史数据库
+                  </button>
+                </div>
+                <div class="admin-table-wrapper" style="max-height: 240px; overflow-y: auto;">
+                  <table class="admin-data-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>账单标题</th>
+                        <th>球场</th>
+                        <th>每人收费</th>
+                        <th>净利润</th>
+                        <th>日期</th>
+                      </tr>
+                    </thead>
+                    <tbody id="admin-cl-bills-tbody">
+                      <!-- Dynamic Recent Bills List -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 4: Audit Logs (审计操作日志) -->
+          <div id="admin-tab-logs" class="admin-tab-panel hidden">
+            <div class="admin-table-wrapper">
+              <table class="admin-data-table">
+                <thead>
+                  <tr>
+                    <th>Log ID</th>
+                    <th>操作管理员</th>
+                    <th>操作类型 (Action)</th>
+                    <th>目标对象</th>
+                    <th>详细变更 (Details)</th>
+                    <th>操作时间</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-logs-tbody">
+                  <!-- Dynamic audit logs -->
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -433,6 +823,84 @@
     </div>
   </div>
 
+  <!-- Modal: 完整编辑历史账单数据弹窗 -->
+  <div id="edit-bill-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">✏️ 编辑历史账单数据</h3>
+          <span class="db-status-badge">⚡ Cloudflare D1 数据库实时更新</span>
+        </div>
+        <button type="button" class="modal-close-btn" id="edit-bill-modal-close">&times;</button>
+      </div>
+      
+      <div class="modal-body">
+        <form id="edit-bill-form" class="manage-form-card" onsubmit="return false;">
+          <input type="hidden" id="edit-bill-id">
+
+          <div class="form-group">
+            <label for="edit-bill-title">账单标题</label>
+            <input type="text" id="edit-bill-title" class="modal-input" required>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-bill-venue">球场名称</label>
+            <input type="text" id="edit-bill-venue" class="modal-input" required>
+          </div>
+
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label for="edit-bill-players">参与总人数</label>
+              <input type="number" id="edit-bill-players" min="1" class="modal-input" required>
+            </div>
+            <div class="form-group">
+              <label for="edit-bill-hosts">Host 免单人数</label>
+              <input type="number" id="edit-bill-hosts" min="0" class="modal-input" required>
+            </div>
+          </div>
+
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label for="edit-bill-courts">场地数量 (片)</label>
+              <input type="number" id="edit-bill-courts" min="1" max="10" class="modal-input" required>
+            </div>
+            <div class="form-group">
+              <label for="edit-bill-duration">时长 (小时)</label>
+              <input type="number" id="edit-bill-duration" min="1" max="12" class="modal-input" required>
+            </div>
+          </div>
+
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label for="edit-bill-shuttles">用球数量 (个)</label>
+              <input type="number" id="edit-bill-shuttles" min="0" class="modal-input" required>
+            </div>
+            <div class="form-group">
+              <label for="edit-bill-shuttle-price">羽球筒价 (RM)</label>
+              <input type="number" id="edit-bill-shuttle-price" step="0.01" min="0" class="modal-input" required>
+            </div>
+          </div>
+
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label for="edit-bill-add-shuttles">附加买球 (个)</label>
+              <input type="number" id="edit-bill-add-shuttles" min="0" class="modal-input" required>
+            </div>
+            <div class="form-group">
+              <label for="edit-bill-player-fee">每人平摊收费 (RM)</label>
+              <input type="number" id="edit-bill-player-fee" step="0.01" min="0" class="modal-input" required>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="btn-save-edit-bill" class="btn-primary-action">💾 保存账单所有修改</button>
+            <button type="button" id="btn-cancel-edit-bill" class="btn-secondary-action">取消</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Reusable Custom Bottom-Sheet Modal Drawer -->
   <div id="drawer-overlay" class="drawer-overlay hidden">
     <div class="drawer-sheet">
@@ -451,6 +919,7 @@
   </div>
 
   <!-- Categorized JS Module Scripts (Supports both file:// double-click & HTTP server) -->
+  <script src="js/core/auth.js"></script>
   <script src="js/core/router.js"></script>
   <script src="js/core/theme.js"></script>
   <script src="js/core/drawer.js"></script>
@@ -460,6 +929,7 @@
   <script src="js/courtledger/swipe.js"></script>
   <script src="js/courtledger/bill.js"></script>
   <script src="js/courtledger/qr.js"></script>
+  <script src="js/admin/admin.js"></script>
   <script src="js/main.js"></script>
 </body>
 

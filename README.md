@@ -38,7 +38,7 @@ HostCalculator/
 
 | 操作目的 | 场景与运行环境 | 数据存储位置 | 说明与命令 |
 | :--- | :--- | :--- | :--- |
-| **本地开发测试** | 访问 `http://localhost:8000` | 电脑本地 `.wrangler/` 隔离数据库 | 运行 `npm run worker:dev` + `npm start`<br>无论如何增删测试球场，都不影响线上云端数据库 |
+| **本地开发测试** | 访问 `http://localhost:8000` | 电脑本地 `.wrangler/` 隔离数据库 | 运行 `npm run dev` 或 `./frontend/start.sh`<br>（支持前端 HMR 样式热重载与全栈热重载，增删测试数据不影响线上） |
 | **同步更新线上表结构** | 更新了 `migrations/` 的 SQL | Cloudflare 线上 D1 云端数据库 | 终端运行 `npm run d1:migrate` |
 | **同步本地数据至线上** | 将本地测试数据推送到线上 | Cloudflare 线上 D1 云端数据库 | 终端运行 `npm run d1:sync:data` |
 | **更新线上真实球场数据** | 访问正式线上网站 (GitHub Pages) | Cloudflare 线上 D1 云端数据库 | 直接在线上网页的【⚙️ 算账设置 -> 🏸 球场数据库管理】中在线添加/修改/删除 |

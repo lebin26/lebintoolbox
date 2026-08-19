@@ -4,16 +4,16 @@
 <div id="view-courtledger" class="app-view hidden">
   <div class="calculator-card">
 
-    <!-- Fixed Section: 每人收费 Display (Large Stock Ticker Style) -->
-    <section class="ticker-section">
+    <!-- Mobile Only Ticker (Hidden on Desktop) -->
+    <section class="ticker-section mobile-only-ticker">
       <div class="ticker-label">每人收费</div>
       <div class="ticker-price-container">
         <span class="ticker-currency currency-unit">RM</span>
-        <span id="player-fee-display" class="ticker-price">0.00</span>
+        <span id="player-fee-display" class="ticker-price player-fee-val">0.00</span>
       </div>
     </section>
 
-    <!-- Swipe Viewport (Calculators on Slide 1, QR Code on Slide 2) -->
+    <!-- Swipe Viewport (Mobile Carousel / Desktop Live Studio) -->
     <div class="swipe-viewport">
       <div class="swipe-track" id="swipe-track">
 
@@ -196,66 +196,97 @@
 
           </section>
 
-          <!-- Output Displays Section -->
-          <section class="outputs-section">
-
-            <!-- 用球统计 (真实用球, Cover用球, 盈利用球, 被计算总用球) -->
-            <div class="shuttle-summary-card">
-              <div class="shuttle-summary-title">🏸 用球统计明细</div>
-              <div class="shuttle-summary-grid">
-                <div class="shuttle-summary-item">
-                  <span class="item-label">真实用球</span>
-                  <span id="sum-actual-shuttles" class="item-val">0 个</span>
-                </div>
-                <div class="shuttle-summary-item">
-                  <span class="item-label">Cover用球</span>
-                  <span id="sum-cover-shuttles" class="item-val tag-blue">0 个</span>
-                </div>
-                <div class="shuttle-summary-item">
-                  <span class="item-label">盈利用球</span>
-                  <span id="sum-profit-shuttles" class="item-val tag-green">0 个</span>
-                </div>
-                <div class="shuttle-summary-item">
-                  <span class="item-label">被计算总用球</span>
-                  <span id="sum-billed-shuttles" class="item-val tag-accent">0 个</span>
-                </div>
+          <!-- Studio Right Panel on Desktop / Inline Section on Mobile -->
+          <div class="studio-sidepanel" id="courtledger-sidepanel">
+            <!-- Desktop Sticky Ticker (Hidden on Mobile) -->
+            <div class="desktop-ticker-card">
+              <div class="ticker-label">每人收费 (实时平摊)</div>
+              <div class="ticker-price-container">
+                <span class="ticker-currency currency-unit">RM</span>
+                <span id="player-fee-display-desktop" class="ticker-price player-fee-val">0.00</span>
               </div>
             </div>
 
-            <!-- Row 6: 总成本 -->
-            <div class="summary-row">
-              <span class="summary-label">真实总成本</span>
-              <div class="summary-value-wrapper">
-                <span class="summary-currency currency-unit">RM</span>
-                <span id="total-cost-display" class="summary-value">0.00</span>
+            <!-- Output Displays Section -->
+            <section class="outputs-section">
+              <!-- 用球统计 (真实用球, Cover用球, 盈利用球, 被计算总用球) -->
+              <div class="shuttle-summary-card">
+                <div class="shuttle-summary-title">🏸 用球统计明细</div>
+                <div class="shuttle-summary-grid">
+                  <div class="shuttle-summary-item">
+                    <span class="item-label">真实用球</span>
+                    <span id="sum-actual-shuttles" class="item-val">0 个</span>
+                  </div>
+                  <div class="shuttle-summary-item">
+                    <span class="item-label">Cover用球</span>
+                    <span id="sum-cover-shuttles" class="item-val tag-blue">0 个</span>
+                  </div>
+                  <div class="shuttle-summary-item">
+                    <span class="item-label">盈利用球</span>
+                    <span id="sum-profit-shuttles" class="item-val tag-green">0 个</span>
+                  </div>
+                  <div class="shuttle-summary-item">
+                    <span class="item-label">被计算总用球</span>
+                    <span id="sum-billed-shuttles" class="item-val tag-accent">0 个</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Row 6: 总成本 -->
+              <div class="summary-row">
+                <span class="summary-label">真实总成本</span>
+                <div class="summary-value-wrapper">
+                  <span class="summary-currency currency-unit">RM</span>
+                  <span id="total-cost-display" class="summary-value">0.00</span>
+                </div>
+              </div>
+
+              <!-- Row 7: 总收款 -->
+              <div class="summary-row">
+                <span class="summary-label">总收款 (付费玩家)</span>
+                <div class="summary-value-wrapper">
+                  <span class="summary-currency currency-unit">RM</span>
+                  <span id="total-revenue-display" class="summary-value">0.00</span>
+                </div>
+              </div>
+
+              <!-- Row 8: 净利润 -->
+              <div id="profit-row" class="summary-row profit-highlight">
+                <span class="summary-label">净利润 (盈利)</span>
+                <div class="summary-value-wrapper">
+                  <span class="summary-currency currency-unit">RM</span>
+                  <span id="net-profit-display" class="summary-value">0.00</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Desktop Live QR Card (Hidden on Mobile) -->
+            <div class="desktop-qr-card">
+              <div class="desktop-qr-header">
+                <span class="qr-card-title">📱 DuitNow 收款码</span>
+                <span class="qr-card-tag">扫码即付</span>
+              </div>
+              <div class="desktop-qr-wrapper">
+                <img src="assets/duitnow-qr.png" alt="收款二维码" class="desktop-qr-image">
               </div>
             </div>
 
-            <!-- Row 7: 总收款 -->
-            <div class="summary-row">
-              <span class="summary-label">总收款 (付费玩家)</span>
-              <div class="summary-value-wrapper">
-                <span class="summary-currency currency-unit">RM</span>
-                <span id="total-revenue-display" class="summary-value">0.00</span>
-              </div>
+            <!-- Bill Action Buttons (Copy, Save, History) -->
+            <div class="bill-actions-row">
+              <button id="copy-bill-btn" class="copy-bill-btn">
+                <span class="btn-icon">📋</span>
+                <span class="btn-text">复制账单</span>
+              </button>
+              <button id="save-bill-btn" class="save-bill-btn">
+                <span class="btn-icon">💾</span>
+                <span class="btn-text">保存账单</span>
+              </button>
+              <button id="history-bill-btn" class="history-bill-btn">
+                <span class="btn-icon">📜</span>
+                <span class="btn-text">历史账单</span>
+              </button>
             </div>
-
-            <!-- Row 8: 净利润 -->
-            <div id="profit-row" class="summary-row profit-highlight">
-              <span class="summary-label">净利润 (盈利)</span>
-              <div class="summary-value-wrapper">
-                <span class="summary-currency currency-unit">RM</span>
-                <span id="net-profit-display" class="summary-value">0.00</span>
-              </div>
-            </div>
-
-          </section>
-
-          <!-- Copy Bill Button -->
-          <button id="copy-bill-btn" class="copy-bill-btn">
-            <span class="btn-icon">📋</span>
-            <span class="btn-text">复制账单明细</span>
-          </button>
+          </div>
 
           <!-- Warning panel for invalid configurations -->
           <div id="error-banner" class="error-banner hidden">
@@ -265,8 +296,8 @@
 
         </div>
 
-        <!-- Slide 2: QR Code page -->
-        <div class="swipe-slide" id="slide-qr">
+        <!-- Slide 2: QR Code page (Mobile Only) -->
+        <div class="swipe-slide mobile-only-slide" id="slide-qr">
           <div class="qr-container">
             <div class="qr-title">QR</div>
             <div class="qr-image-wrapper">
@@ -280,7 +311,7 @@
     </div>
 
     <!-- Page indicator dots -->
-    <div class="page-indicators">
+    <div class="page-indicators mobile-only-indicators">
       <span class="indicator-dot active" data-page="0"></span>
       <span class="indicator-dot" data-page="1"></span>
     </div>
@@ -331,6 +362,84 @@
           <!-- 动态渲染球场列表 -->
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: 完整编辑历史账单数据弹窗 -->
+<div id="edit-bill-modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">✏️ 编辑历史账单数据</h3>
+        <span class="db-status-badge">⚡ Cloudflare D1 数据库实时更新</span>
+      </div>
+      <button type="button" class="modal-close-btn" id="edit-bill-modal-close">&times;</button>
+    </div>
+    
+    <div class="modal-body">
+      <form id="edit-bill-form" class="manage-form-card" onsubmit="return false;">
+        <input type="hidden" id="edit-bill-id">
+
+        <div class="form-group">
+          <label for="edit-bill-title">账单标题</label>
+          <input type="text" id="edit-bill-title" class="modal-input" required>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-bill-venue">球场名称</label>
+          <input type="text" id="edit-bill-venue" class="modal-input" required>
+        </div>
+
+        <div class="form-row-2col">
+          <div class="form-group">
+            <label for="edit-bill-players">参与总人数</label>
+            <input type="number" id="edit-bill-players" min="1" class="modal-input" required>
+          </div>
+          <div class="form-group">
+            <label for="edit-bill-hosts">Host 免单人数</label>
+            <input type="number" id="edit-bill-hosts" min="0" class="modal-input" required>
+          </div>
+        </div>
+
+        <div class="form-row-2col">
+          <div class="form-group">
+            <label for="edit-bill-courts">场地数量 (片)</label>
+            <input type="number" id="edit-bill-courts" min="1" max="10" class="modal-input" required>
+          </div>
+          <div class="form-group">
+            <label for="edit-bill-duration">时长 (小时)</label>
+            <input type="number" id="edit-bill-duration" min="1" max="12" class="modal-input" required>
+          </div>
+        </div>
+
+        <div class="form-row-2col">
+          <div class="form-group">
+            <label for="edit-bill-shuttles">用球数量 (个)</label>
+            <input type="number" id="edit-bill-shuttles" min="0" class="modal-input" required>
+          </div>
+          <div class="form-group">
+            <label for="edit-bill-shuttle-price">羽球筒价 (RM)</label>
+            <input type="number" id="edit-bill-shuttle-price" step="0.01" min="0" class="modal-input" required>
+          </div>
+        </div>
+
+        <div class="form-row-2col">
+          <div class="form-group">
+            <label for="edit-bill-add-shuttles">附加买球 (个)</label>
+            <input type="number" id="edit-bill-add-shuttles" min="0" class="modal-input" required>
+          </div>
+          <div class="form-group">
+            <label for="edit-bill-player-fee">每人平摊收费 (RM)</label>
+            <input type="number" id="edit-bill-player-fee" step="0.01" min="0" class="modal-input" required>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" id="btn-save-edit-bill" class="btn-primary-action">💾 保存账单所有修改</button>
+          <button type="button" id="btn-cancel-edit-bill" class="btn-secondary-action">取消</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
