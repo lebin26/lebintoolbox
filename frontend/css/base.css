@@ -365,6 +365,12 @@ body {
   opacity: 1;
 }
 
+#view-login.active {
+  display: flex !important;
+  justify-content: center;
+  align-items: center;
+}
+
 .app-view.hidden {
   display: none !important;
 }
