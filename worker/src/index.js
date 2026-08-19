@@ -448,8 +448,8 @@ function validateUsername(name) {
                     additional_shuttles AS additionalShuttles, player_fee AS playerFee,
                     total_cost AS totalCost, total_revenue AS totalRevenue, net_profit AS netProfit,
                     user_id AS userId, created_at AS createdAt, updated_at AS updatedAt
-             FROM bills WHERE user_id = ? ORDER BY id DESC`
-          ).bind(targetId).all();
+             FROM bills WHERE (user_id = ? OR (user_id IS NULL AND ? = 1)) ORDER BY id DESC`
+          ).bind(targetId, targetId).all();
 
           return jsonResponse({
             user: targetUser,
@@ -711,8 +711,8 @@ function validateUsername(name) {
                     additional_shuttles AS additionalShuttles, player_fee AS playerFee,
                     total_cost AS totalCost, total_revenue AS totalRevenue, net_profit AS netProfit,
                     user_id AS userId, created_at AS createdAt, updated_at AS updatedAt
-             FROM bills WHERE user_id = ? ORDER BY id DESC`
-          ).bind(currentUser.id).all();
+             FROM bills WHERE (user_id = ? OR (user_id IS NULL AND ? = 1)) ORDER BY id DESC`
+          ).bind(currentUser.id, currentUser.id).all();
           results = query.results;
         } else {
           // Unauthenticated requests
