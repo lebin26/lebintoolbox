@@ -3,20 +3,36 @@
    Premium Minimal — no glass, no blobs, no glow.
    ========================================================================== */
 
-/* Reset */
-*, *::before, *::after {
+/* Global App-Like Non-Selectable Reset (Native UI Feel) */
+html,
+body,
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Explicitly Allow Text Selection and Typing in Form Inputs & Editable Fields */
+input,
+textarea,
+[contenteditable="true"],
+.selectable-text {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
 }
 
 input, textarea, select, button {
   font: inherit;
-}
-
-input, textarea {
-  -webkit-user-select: text;
-  user-select: text;
 }
 
 /* Body */
