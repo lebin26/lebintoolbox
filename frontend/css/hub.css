@@ -7,8 +7,9 @@
 .shortcuts-grid {
   display: grid;
   grid-template-columns: 1fr;
-  max-width: 480px;
-  margin: var(--space-4) auto 0;
+  max-width: 600px;
+  margin: var(--space-2) auto 0;
+  gap: var(--space-3);
   padding: 0;
 }
 

@@ -153,6 +153,21 @@
     return data.user;
   }
 
+  async function updateProfile(profileData) {
+    const response = await fetch(getApiBaseUrl() + '/api/auth/profile', {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(profileData)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || '更新个人资料失败');
+    }
+
+    setSession(data.user, data.token || currentToken);
+    return data.user;
+  }
+
   function logout() {
     setSession(null, null);
     if (window.AppRouter && typeof window.AppRouter.switchView === 'function') {
@@ -166,6 +181,7 @@
     initAuth,
     login,
     register,
+    updateProfile,
     logout,
     getAuthHeaders,
     get token() { return currentToken; },

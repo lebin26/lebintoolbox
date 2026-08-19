@@ -16,26 +16,32 @@
     return `${h - 12}:00 PM`;
   }
 
-  function calculateCourtFee(startHour, duration, rateMorning, rateEvening) {
+  function calculateCourtFee(startHour, duration, rateMorning, rateEvening, courtCount = 1) {
     let totalFee = 0;
-    let hasMorning = false;
-    let hasEvening = false;
+    let morningHours = 0;
+    let eveningHours = 0;
 
     for (let h = 0; h < duration; h++) {
       const hourOfDay = (startHour + h) % 24;
       if (hourOfDay >= 0 && hourOfDay < 18) {
         totalFee += rateMorning;
-        hasMorning = true;
+        morningHours++;
       } else {
         totalFee += rateEvening;
-        hasEvening = true;
+        eveningHours++;
       }
     }
 
+    const courts = Math.max(1, parseInt(courtCount) || 1);
+    const totalFeeAllCourts = totalFee * courts;
+
     return {
-      fee: totalFee,
-      hasMorning,
-      hasEvening
+      fee: totalFeeAllCourts,
+      singleCourtFee: totalFee,
+      morningHours,
+      eveningHours,
+      hasMorning: morningHours > 0,
+      hasEvening: eveningHours > 0
     };
   }
 
@@ -135,6 +141,7 @@
     formatCurrency,
     format12Hour,
     calculateCourtFee,
+    computeCourtFee: calculateCourtFee,
     calculateRequiredHostShuttles,
     computeFeeAndBreakdown
   };

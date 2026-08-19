@@ -239,7 +239,18 @@ Authenticates a user or admin account and returns a Bearer Token.
 
 ---
 
-### 10. Admin Dashboard Analytics
+### 10. User Profile Management
+Allows an authenticated user to edit their own username and/or password.
+
+- **Method**: `PATCH`
+- **Endpoint**: `/api/auth/profile`
+- **Header**: `Authorization: Bearer <token>`
+- **Body**: `{ "name": "NewUsername", "password": "NewSecretPassword123" }`
+- **Response (`200 OK`)**: `{ "message": "个人资料已更新", "user": { ... }, "token": "..." }`
+
+---
+
+### 11. Admin Dashboard Analytics
 Retrieves total system metrics (Users, Active/Suspended, Bills, Profit).
 
 - **Method**: `GET`
@@ -249,10 +260,15 @@ Retrieves total system metrics (Users, Active/Suspended, Bills, Profit).
 
 ---
 
-### 11. Admin User Management & Audit Logs
+### 12. Admin User Management & Audit Logs
 - `GET /api/admin/users`: List users with search & filters.
-- `PATCH /api/admin/users/:id`: Update user role / status with Audit Log.
+- `GET /api/admin/users/:id`: Get detailed user information.
+- `GET /api/admin/users/:id/bills`: Get all bills belonging to a specific user.
+- `PATCH /api/admin/users/:id`: Update user username, email, password, role, or status with Audit Log.
 - `POST /api/admin/users/:id/suspend`: Freeze user account.
 - `POST /api/admin/users/:id/activate`: Re-activate user account.
+- `DELETE /api/admin/users/:id`: Permanently delete a user account with safety checks and Audit Log.
 - `GET /api/admin/logs`: View admin audit trail.
+
+
 

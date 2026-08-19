@@ -43,6 +43,9 @@
                 <div id="hub-user-info" style="padding: 4px 8px; font-size: 0.85rem; color: var(--color-text-muted);">
                   <!-- Dynamic user info -->
                 </div>
+                <button type="button" class="dropdown-action-btn btn-open-profile" style="margin-top:6px; width:100%; cursor:pointer;">
+                  👤 个人资料与密码修改
+                </button>
                 <button type="button" class="dropdown-action-btn danger-text btn-logout" style="margin-top:6px; width:100%; cursor:pointer;">
                   🚪 退出登录
                 </button>
@@ -90,6 +93,9 @@
                 <div id="courtledger-user-info" style="padding: 4px 8px; font-size: 0.85rem; color: var(--color-text-muted);">
                   <!-- Dynamic user info -->
                 </div>
+                <button type="button" class="dropdown-action-btn btn-open-profile" style="margin-top:6px; width:100%; cursor:pointer;">
+                  👤 个人资料与密码修改
+                </button>
                 <button type="button" class="dropdown-action-btn danger-text btn-logout" style="margin-top:6px; width:100%; cursor:pointer;">
                   🚪 退出登录
                 </button>
@@ -897,6 +903,156 @@
             <button type="button" id="btn-cancel-edit-bill" class="btn-secondary-action">取消</button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Profile & Password Modal -->
+  <div id="user-profile-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">👤 个人资料与安全设置</h3>
+        <button type="button" id="btn-close-profile-modal" class="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="user-profile-form" class="profile-form">
+          <div class="form-group">
+            <label for="profile-email-display">绑定登录账号 (邮箱)</label>
+            <input type="text" id="profile-email-display" class="modal-input" disabled readonly style="opacity: 0.7; cursor: not-allowed;">
+          </div>
+
+          <div class="form-group">
+            <label for="profile-username-input">用户名 / 昵称 (3-20位)</label>
+            <input type="text" id="profile-username-input" class="modal-input" placeholder="输入您的用户名" required maxlength="20">
+            <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 2px;">支持字母、数字、中文、下划线及减号，不可包含空格</small>
+          </div>
+
+          <div class="form-group">
+            <label for="profile-new-password">修改密码 (留空则保持不变)</label>
+            <input type="password" id="profile-new-password" class="modal-input" placeholder="若无需修改请留空 (不少于6位)" minlength="6">
+          </div>
+
+          <div class="form-group">
+            <label for="profile-confirm-password">确认新密码</label>
+            <input type="password" id="profile-confirm-password" class="modal-input" placeholder="再次输入新密码">
+          </div>
+
+          <div class="form-group">
+            <label>当前用户角色与状态</label>
+            <div id="profile-role-badge" style="padding: 6px 12px; background: var(--surface-hover); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); font-size: 0.85rem; color: var(--text-primary);">
+              --
+            </div>
+          </div>
+
+          <div class="form-actions" style="margin-top: 16px;">
+            <button type="submit" id="btn-save-user-profile" class="btn-primary-action">💾 保存个人资料</button>
+            <button type="button" id="btn-cancel-user-profile" class="btn-secondary-action">取消</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Edit User Modal -->
+  <div id="admin-edit-user-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">✏️ 管理员修改用户信息</h3>
+        <button type="button" id="btn-close-admin-edit-user-modal" class="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="admin-edit-user-form" class="edit-user-form">
+          <input type="hidden" id="admin-edit-user-id">
+
+          <div class="form-group">
+            <label for="admin-edit-user-email">用户邮箱 (账号)</label>
+            <input type="email" id="admin-edit-user-email" class="modal-input" required placeholder="user@example.com">
+          </div>
+
+          <div class="form-group">
+            <label for="admin-edit-user-name">用户名 / 昵称 (3-20位)</label>
+            <input type="text" id="admin-edit-user-name" class="modal-input" required maxlength="20" placeholder="用户名">
+          </div>
+
+          <div class="form-group">
+            <label for="admin-edit-user-password">重置密码 (留空则不修改)</label>
+            <input type="text" id="admin-edit-user-password" class="modal-input" placeholder="输入新密码 (不少于6位)">
+          </div>
+
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label for="admin-edit-user-role">用户角色权限</label>
+              <select id="admin-edit-user-role" class="modal-select">
+                <option value="user">Standard User (普通用户)</option>
+                <option value="admin">Administrator (管理员)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="admin-edit-user-status">账号状态</label>
+              <select id="admin-edit-user-status" class="modal-select">
+                <option value="active">🟢 正常 (Active)</option>
+                <option value="suspended">🔴 冻结 (Suspended)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-actions" style="margin-top: 16px;">
+            <button type="submit" id="btn-save-admin-edit-user" class="btn-primary-action">💾 确认更新用户</button>
+            <button type="button" id="btn-cancel-admin-edit-user" class="btn-secondary-action">取消</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin View User Bills Modal -->
+  <div id="admin-user-bills-modal" class="modal-overlay hidden">
+    <div class="modal-card" style="max-width: 840px; width: 95%;">
+      <div class="modal-header">
+        <h3 class="modal-title">📜 用户账单明细 — <span id="admin-user-bills-header-name">--</span></h3>
+        <button type="button" id="btn-close-admin-user-bills-modal" class="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: var(--space-4);">
+        <!-- Summary Stats for this user -->
+        <div class="kpi-dashboard-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 0;">
+          <div class="kpi-card" style="padding: 10px 14px;">
+            <span class="kpi-label">📁 账单数量</span>
+            <span id="admin-user-kpi-count" class="kpi-value" style="font-size: 1.2rem;">0 笔</span>
+          </div>
+          <div class="kpi-card" style="padding: 10px 14px;">
+            <span class="kpi-label">💰 累计收款</span>
+            <span id="admin-user-kpi-revenue" class="kpi-value" style="font-size: 1.2rem;">RM 0.00</span>
+          </div>
+          <div class="kpi-card" style="padding: 10px 14px;">
+            <span class="kpi-label">📈 累计利润</span>
+            <span id="admin-user-kpi-profit" class="kpi-value tag-bullish" style="font-size: 1.2rem;">RM 0.00</span>
+          </div>
+        </div>
+
+        <!-- User Bills Table -->
+        <div class="admin-table-wrapper" style="max-height: 380px; overflow-y: auto;">
+          <table class="admin-data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>账单名称</th>
+                <th>球场</th>
+                <th>用时</th>
+                <th>人数</th>
+                <th>每人收费</th>
+                <th>净利润</th>
+                <th>创建时间</th>
+              </tr>
+            </thead>
+            <tbody id="admin-user-bills-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="form-actions" style="justify-content: flex-end; margin-top: 4px;">
+          <button type="button" id="btn-done-admin-user-bills" class="btn-secondary-action">关闭</button>
+        </div>
       </div>
     </div>
   </div>

@@ -301,6 +301,52 @@ function validateUsername(name) {
         return jsonResponse({ user: currentUser });
       }
 
+      // PATCH /api/auth/profile - Update current logged-in user profile (Username and/or Password)
+      if (method === 'PATCH' && (path === '/api/auth/profile' || path === '/api/auth/me')) {
+        const currentUser = await getAuthenticatedUser(request, env);
+        if (!currentUser) {
+          return errorResponse('未登录或 Session 已失效', 401);
+        }
+
+        const body = await request.json();
+        const { name, password } = body;
+
+        let newName = currentUser.name;
+        if (name !== undefined && name !== currentUser.name) {
+          const check = validateUsername(name);
+          if (!check.valid) return errorResponse(check.error);
+          newName = check.name;
+          const existingName = await env.DB.prepare('SELECT id FROM users WHERE LOWER(name) = ? AND id != ?').bind(newName.toLowerCase(), currentUser.id).first();
+          if (existingName) return errorResponse('该用户名已被其他用户使用，请换一个用户名');
+        }
+
+        if (password) {
+          if (typeof password !== 'string' || password.length < 6) {
+            return errorResponse('新密码长度不能少于 6 位');
+          }
+          const pwdHash = await hashPassword(password);
+          await env.DB.prepare(
+            'UPDATE users SET name = ?, password_hash = ?, plain_password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+          ).bind(newName, pwdHash, password, currentUser.id).run();
+        } else {
+          await env.DB.prepare(
+            'UPDATE users SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+          ).bind(newName, currentUser.id).run();
+        }
+
+        const updatedUser = await env.DB.prepare(
+          'SELECT id, email, name, avatar, role, status, created_at AS createdAt, last_login_at AS lastLoginAt FROM users WHERE id = ?'
+        ).bind(currentUser.id).first();
+
+        const token = generateToken(currentUser.id, currentUser.role);
+
+        return jsonResponse({
+          message: '个人资料已更新',
+          user: updatedUser,
+          token
+        });
+      }
+
       // POST /api/auth/logout - Logout (Client clears token)
       if (method === 'POST' && path === '/api/auth/logout') {
         return jsonResponse({ message: '退出登录成功' });
@@ -383,14 +429,42 @@ function validateUsername(name) {
           return jsonResponse({ user: targetUser });
         }
 
+        // GET /api/admin/users/:id/bills - Get all bills belonging to a specific user
+        const getUserBillsMatch = path.match(/^\/api\/admin\/users\/(\d+)\/bills$/);
+        if (method === 'GET' && getUserBillsMatch) {
+          const targetId = parseInt(getUserBillsMatch[1]);
+          const targetUser = await env.DB.prepare(
+            'SELECT id, email, name, role, status FROM users WHERE id = ?'
+          ).bind(targetId).first();
+
+          if (!targetUser) {
+            return errorResponse('未找到指定用户', 404);
+          }
+
+          const { results } = await env.DB.prepare(
+            `SELECT id, title, venue_name AS venueName, start_time AS startTime, duration,
+                    court_count AS courtCount, court_fee AS courtFee, total_players AS totalPlayers,
+                    host_count AS hostCount, shuttles_used AS shuttlesUsed, shuttle_price AS shuttlePrice,
+                    additional_shuttles AS additionalShuttles, player_fee AS playerFee,
+                    total_cost AS totalCost, total_revenue AS totalRevenue, net_profit AS netProfit,
+                    user_id AS userId, created_at AS createdAt, updated_at AS updatedAt
+             FROM bills WHERE user_id = ? ORDER BY id DESC`
+          ).bind(targetId).all();
+
+          return jsonResponse({
+            user: targetUser,
+            bills: results || []
+          });
+        }
+
         // PATCH /api/admin/users/:id - Update User Role / Status / Info
         const patchUserMatch = path.match(/^\/api\/admin\/users\/(\d+)$/);
         if (method === 'PATCH' && patchUserMatch) {
           const targetId = parseInt(patchUserMatch[1]);
           const body = await request.json();
-          const { name, role, status, password } = body;
+          const { name, email, role, status, password } = body;
 
-          const targetUser = await env.DB.prepare('SELECT id, name, role, status FROM users WHERE id = ?').bind(targetId).first();
+          const targetUser = await env.DB.prepare('SELECT id, email, name, role, status FROM users WHERE id = ?').bind(targetId).first();
           if (!targetUser) return errorResponse('未找到指定用户', 404);
 
           // Admin Safeguard Rule 8: Prevent demoting/suspending the last active admin!
@@ -410,26 +484,42 @@ function validateUsername(name) {
             if (existingName) return errorResponse('该用户名已被其他用户使用，请换一个用户名');
           }
 
+          let newEmail = targetUser.email;
+          if (email !== undefined && email.trim().toLowerCase() !== targetUser.email.toLowerCase()) {
+            const cleanEmail = email.trim().toLowerCase();
+            if (!cleanEmail || !cleanEmail.includes('@')) {
+              return errorResponse('请输入有效的电子邮箱地址');
+            }
+            const existingEmail = await env.DB.prepare('SELECT id FROM users WHERE LOWER(email) = ? AND id != ?').bind(cleanEmail, targetId).first();
+            if (existingEmail) return errorResponse('该邮箱已被其他用户使用，请换一个邮箱');
+            newEmail = cleanEmail;
+          }
+
           const newRole = role !== undefined ? role : targetUser.role;
           const newStatus = status !== undefined ? status : targetUser.status;
 
           if (password && password.length >= 6) {
             const pwdHash = await hashPassword(password);
             await env.DB.prepare(
-              'UPDATE users SET name = ?, role = ?, status = ?, password_hash = ?, plain_password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-            ).bind(newName, newRole, newStatus, pwdHash, password, targetId).run();
+              'UPDATE users SET name = ?, email = ?, role = ?, status = ?, password_hash = ?, plain_password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+            ).bind(newName, newEmail, newRole, newStatus, pwdHash, password, targetId).run();
           } else {
             await env.DB.prepare(
-              'UPDATE users SET name = ?, role = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-            ).bind(newName, newRole, newStatus, targetId).run();
+              'UPDATE users SET name = ?, email = ?, role = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+            ).bind(newName, newEmail, newRole, newStatus, targetId).run();
           }
 
           // Audit Log
           await createAdminLog(env, adminUser.id, adminUser.name, 'UPDATE_USER', 'user', targetId, {
+            previousName: targetUser.name,
+            newName,
+            previousEmail: targetUser.email,
+            newEmail,
             previousRole: targetUser.role,
             newRole,
             previousStatus: targetUser.status,
-            newStatus
+            newStatus,
+            passwordChanged: !!(password && password.length >= 6)
           });
 
           return jsonResponse({ message: '用户信息已成功修改', id: targetId });
@@ -466,6 +556,31 @@ function validateUsername(name) {
           await createAdminLog(env, adminUser.id, adminUser.name, 'ACTIVATE_USER', 'user', targetId, `解冻激活了用户 ${targetUser.name} (${targetId})`);
 
           return jsonResponse({ message: `用户 ${targetUser.name} 已重新激活` });
+        }
+
+        // DELETE /api/admin/users/:id - Delete User Permanently
+        const deleteUserMatch = path.match(/^\/api\/admin\/users\/(\d+)$/);
+        if (method === 'DELETE' && deleteUserMatch) {
+          const targetId = parseInt(deleteUserMatch[1]);
+          const targetUser = await env.DB.prepare('SELECT id, name, email, role FROM users WHERE id = ?').bind(targetId).first();
+          if (!targetUser) return errorResponse('未找到指定用户', 404);
+
+          if (targetId === adminUser.id) {
+            return errorResponse('安全限制拒绝：不能删除当前正在操作的管理员账号！', 400);
+          }
+
+          if (targetUser.role === 'admin') {
+            const adminCountRes = await env.DB.prepare('SELECT COUNT(*) AS count FROM users WHERE role = "admin" AND status = "active" AND id != ?').bind(targetId).first();
+            if ((adminCountRes?.count || 0) === 0) {
+              return errorResponse('安全限制拒绝：无法删除系统中唯一的管理员账号！', 400);
+            }
+          }
+
+          // Delete user from database
+          await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(targetId).run();
+          await createAdminLog(env, adminUser.id, adminUser.name, 'DELETE_USER', 'user', targetId, `删除了用户 ${targetUser.name} (${targetUser.email})`);
+
+          return jsonResponse({ message: `用户 ${targetUser.name} 已成功删除`, id: targetId });
         }
 
         // GET /api/admin/logs - Fetch Admin Audit Logs
@@ -569,29 +684,55 @@ function validateUsername(name) {
         return jsonResponse({ message: '球场删除成功', id });
       }
 
-      // GET /api/bills - Fetch all saved bills from D1
+      // GET /api/bills - Fetch saved bills from D1 (Account Isolated)
       if (method === 'GET' && path === '/api/bills') {
-        const { results } = await env.DB.prepare(
-          `SELECT id, title, venue_name AS venueName, start_time AS startTime, duration,
-                  court_count AS courtCount, court_fee AS courtFee, total_players AS totalPlayers,
-                  host_count AS hostCount, shuttles_used AS shuttlesUsed, shuttle_price AS shuttlePrice,
-                  additional_shuttles AS additionalShuttles, player_fee AS playerFee,
-                  total_cost AS totalCost, total_revenue AS totalRevenue, net_profit AS netProfit,
-                  user_id AS userId, created_at AS createdAt, updated_at AS updatedAt
-           FROM bills ORDER BY id DESC`
-        ).all();
+        const currentUser = await getAuthenticatedUser(request, env);
+        const scope = url.searchParams.get('scope');
+
+        let results;
+        if (currentUser && currentUser.role === 'admin' && scope === 'all') {
+          // Admin Overview scope - all bills
+          const query = await env.DB.prepare(
+            `SELECT id, title, venue_name AS venueName, start_time AS startTime, duration,
+                    court_count AS courtCount, court_fee AS courtFee, total_players AS totalPlayers,
+                    host_count AS hostCount, shuttles_used AS shuttlesUsed, shuttle_price AS shuttlePrice,
+                    additional_shuttles AS additionalShuttles, player_fee AS playerFee,
+                    total_cost AS totalCost, total_revenue AS totalRevenue, net_profit AS netProfit,
+                    user_id AS userId, created_at AS createdAt, updated_at AS updatedAt
+             FROM bills ORDER BY id DESC`
+          ).all();
+          results = query.results;
+        } else if (currentUser) {
+          // User-isolated bills (only bills created by the current user)
+          const query = await env.DB.prepare(
+            `SELECT id, title, venue_name AS venueName, start_time AS startTime, duration,
+                    court_count AS courtCount, court_fee AS courtFee, total_players AS totalPlayers,
+                    host_count AS hostCount, shuttles_used AS shuttlesUsed, shuttle_price AS shuttlePrice,
+                    additional_shuttles AS additionalShuttles, player_fee AS playerFee,
+                    total_cost AS totalCost, total_revenue AS totalRevenue, net_profit AS netProfit,
+                    user_id AS userId, created_at AS createdAt, updated_at AS updatedAt
+             FROM bills WHERE user_id = ? ORDER BY id DESC`
+          ).bind(currentUser.id).all();
+          results = query.results;
+        } else {
+          // Unauthenticated requests
+          results = [];
+        }
 
         return jsonResponse({ bills: results || [] });
       }
 
-      // POST /api/bills - Save new bill to D1
+      // POST /api/bills - Save new bill to D1 (Bound to Authenticated User)
       if (method === 'POST' && path === '/api/bills') {
+        const currentUser = await getAuthenticatedUser(request, env);
         const body = await request.json();
         const {
           title, venueName, startTime, duration, courtCount, courtFee,
           totalPlayers, hostCount, shuttlesUsed, shuttlePrice, additionalShuttles,
-          playerFee, totalCost, totalRevenue, netProfit, userId
+          playerFee, totalCost, totalRevenue, netProfit
         } = body;
+
+        const ownerId = currentUser ? currentUser.id : (body.userId || null);
 
         const billTitle = title && title.trim() ? title.trim() : `${new Date().toISOString().slice(0, 10)} AA 账单`;
         const vName = venueName ? String(venueName).trim() : '默认场地';
@@ -607,7 +748,7 @@ function validateUsername(name) {
           parseInt(startTime) || 16, parseInt(duration) || 2, parseInt(courtCount) || 1, parseFloat(courtFee) || 0.0,
           parseInt(totalPlayers) || 6, parseInt(hostCount) || 0, parseInt(shuttlesUsed) || 3, parseFloat(shuttlePrice) || 0.0,
           parseInt(additionalShuttles) || 0, parseFloat(playerFee) || 0.0, parseFloat(totalCost) || 0.0,
-          parseFloat(totalRevenue) || 0.0, parseFloat(netProfit) || 0.0, userId || null
+          parseFloat(totalRevenue) || 0.0, parseFloat(netProfit) || 0.0, ownerId
         ).run();
 
         return jsonResponse({
@@ -618,16 +759,17 @@ function validateUsername(name) {
             venueName: vName,
             startTime, duration, courtCount, courtFee,
             totalPlayers, hostCount, shuttlesUsed, shuttlePrice, additionalShuttles,
-            playerFee, totalCost, totalRevenue, netProfit, userId: userId || null,
+            playerFee, totalCost, totalRevenue, netProfit, userId: ownerId,
             createdAt: new Date().toISOString()
           }
         }, 201);
       }
 
-      // PUT /api/bills/:id - Update existing bill in D1
+      // PUT /api/bills/:id - Update existing bill in D1 (Account Isolated)
       const putBillMatch = path.match(/^\/api\/bills\/(\d+)$/);
       if (method === 'PUT' && putBillMatch) {
         const id = parseInt(putBillMatch[1]);
+        const currentUser = await getAuthenticatedUser(request, env);
         const body = await request.json();
         const {
           title, venueName, startTime, duration, courtCount, courtFee,
@@ -635,37 +777,67 @@ function validateUsername(name) {
           playerFee, totalCost, totalRevenue, netProfit
         } = body;
 
-        const result = await env.DB.prepare(
-          `UPDATE bills SET
-            title = ?, venue_name = ?, start_time = ?, duration = ?, court_count = ?, court_fee = ?,
-            total_players = ?, host_count = ?, shuttles_used = ?, shuttle_price = ?, additional_shuttles = ?,
-            player_fee = ?, total_cost = ?, total_revenue = ?, net_profit = ?, updated_at = CURRENT_TIMESTAMP
-           WHERE id = ?`
-        ).bind(
-          title ? String(title).trim() : '已修改账单',
-          venueName ? String(venueName).trim() : '默认场地',
-          parseInt(startTime) || 16, parseInt(duration) || 2, parseInt(courtCount) || 1, parseFloat(courtFee) || 0.0,
-          parseInt(totalPlayers) || 6, parseInt(hostCount) || 0, parseInt(shuttlesUsed) || 3, parseFloat(shuttlePrice) || 0.0,
-          parseInt(additionalShuttles) || 0, parseFloat(playerFee) || 0.0, parseFloat(totalCost) || 0.0,
-          parseFloat(totalRevenue) || 0.0, parseFloat(netProfit) || 0.0,
-          id
-        ).run();
+        let result;
+        if (currentUser && currentUser.role === 'admin') {
+          result = await env.DB.prepare(
+            `UPDATE bills SET
+              title = ?, venue_name = ?, start_time = ?, duration = ?, court_count = ?, court_fee = ?,
+              total_players = ?, host_count = ?, shuttles_used = ?, shuttle_price = ?, additional_shuttles = ?,
+              player_fee = ?, total_cost = ?, total_revenue = ?, net_profit = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`
+          ).bind(
+            title ? String(title).trim() : '已修改账单',
+            venueName ? String(venueName).trim() : '默认场地',
+            parseInt(startTime) || 16, parseInt(duration) || 2, parseInt(courtCount) || 1, parseFloat(courtFee) || 0.0,
+            parseInt(totalPlayers) || 6, parseInt(hostCount) || 0, parseInt(shuttlesUsed) || 3, parseFloat(shuttlePrice) || 0.0,
+            parseInt(additionalShuttles) || 0, parseFloat(playerFee) || 0.0, parseFloat(totalCost) || 0.0,
+            parseFloat(totalRevenue) || 0.0, parseFloat(netProfit) || 0.0,
+            id
+          ).run();
+        } else if (currentUser) {
+          result = await env.DB.prepare(
+            `UPDATE bills SET
+              title = ?, venue_name = ?, start_time = ?, duration = ?, court_count = ?, court_fee = ?,
+              total_players = ?, host_count = ?, shuttles_used = ?, shuttle_price = ?, additional_shuttles = ?,
+              player_fee = ?, total_cost = ?, total_revenue = ?, net_profit = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ? AND user_id = ?`
+          ).bind(
+            title ? String(title).trim() : '已修改账单',
+            venueName ? String(venueName).trim() : '默认场地',
+            parseInt(startTime) || 16, parseInt(duration) || 2, parseInt(courtCount) || 1, parseFloat(courtFee) || 0.0,
+            parseInt(totalPlayers) || 6, parseInt(hostCount) || 0, parseInt(shuttlesUsed) || 3, parseFloat(shuttlePrice) || 0.0,
+            parseInt(additionalShuttles) || 0, parseFloat(playerFee) || 0.0, parseFloat(totalCost) || 0.0,
+            parseFloat(totalRevenue) || 0.0, parseFloat(netProfit) || 0.0,
+            id, currentUser.id
+          ).run();
+        } else {
+          return errorResponse('未授权操作', 401);
+        }
 
         if (result.meta.changes === 0) {
-          return errorResponse('未找到指定账单', 404);
+          return errorResponse('未找到指定账单或无权修改该账单', 404);
         }
 
         return jsonResponse({ message: '账单更新成功', id });
       }
 
-      // DELETE /api/bills/:id - Delete bill from D1
+      // DELETE /api/bills/:id - Delete bill from D1 (Account Isolated)
       const deleteBillMatch = path.match(/^\/api\/bills\/(\d+)$/);
       if (method === 'DELETE' && deleteBillMatch) {
         const id = parseInt(deleteBillMatch[1]);
-        const result = await env.DB.prepare('DELETE FROM bills WHERE id = ?').bind(id).run();
+        const currentUser = await getAuthenticatedUser(request, env);
+
+        let result;
+        if (currentUser && currentUser.role === 'admin') {
+          result = await env.DB.prepare('DELETE FROM bills WHERE id = ?').bind(id).run();
+        } else if (currentUser) {
+          result = await env.DB.prepare('DELETE FROM bills WHERE id = ? AND user_id = ?').bind(id, currentUser.id).run();
+        } else {
+          return errorResponse('未授权操作', 401);
+        }
 
         if (result.meta.changes === 0) {
-          return errorResponse('未找到指定账单', 404);
+          return errorResponse('未找到指定账单或无权删除该账单', 404);
         }
 
         return jsonResponse({ message: '账单删除成功', id });

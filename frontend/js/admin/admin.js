@@ -69,6 +69,75 @@
         if (window.AppRouter) window.AppRouter.switchView('historybills');
       });
     }
+
+    // Admin Edit User Modal Event Bindings
+    const editModal = document.getElementById('admin-edit-user-modal');
+    const btnCloseEditModal = document.getElementById('btn-close-admin-edit-user-modal');
+    const btnCancelEditModal = document.getElementById('btn-cancel-admin-edit-user');
+    const editUserForm = document.getElementById('admin-edit-user-form');
+
+    if (btnCloseEditModal) btnCloseEditModal.addEventListener('click', closeAdminEditUserModal);
+    if (btnCancelEditModal) btnCancelEditModal.addEventListener('click', closeAdminEditUserModal);
+    if (editModal) {
+      editModal.addEventListener('click', (e) => {
+        if (e.target === editModal) closeAdminEditUserModal();
+      });
+    }
+
+    if (editUserForm) {
+      editUserForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const userId = document.getElementById('admin-edit-user-id').value;
+        const email = document.getElementById('admin-edit-user-email').value.trim();
+        const name = document.getElementById('admin-edit-user-name').value.trim();
+        const password = document.getElementById('admin-edit-user-password').value;
+        const role = document.getElementById('admin-edit-user-role').value;
+        const status = document.getElementById('admin-edit-user-status').value;
+
+        const updateData = { email, name, role, status };
+        if (password && password.length > 0) {
+          if (password.length < 6) {
+            if (typeof window.showToast === 'function') window.showToast('❌ 密码长度不能少于 6 位');
+            return;
+          }
+          updateData.password = password;
+        }
+
+        try {
+          const response = await fetch(getApiBaseUrl() + `/api/admin/users/${userId}`, {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: JSON.stringify(updateData)
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || '修改失败');
+
+          if (typeof window.showToast === 'function') {
+            window.showToast('✅ 用户信息修改成功');
+          }
+          closeAdminEditUserModal();
+          loadUsersList();
+          loadUsersStats();
+        } catch (err) {
+          if (typeof window.showToast === 'function') {
+            window.showToast(`❌ 修改失败: ${err.message}`);
+          }
+        }
+      });
+    }
+
+    // Admin View User Bills Modal Event Bindings
+    const userBillsModal = document.getElementById('admin-user-bills-modal');
+    const btnCloseUserBillsModal = document.getElementById('btn-close-admin-user-bills-modal');
+    const btnDoneUserBillsModal = document.getElementById('btn-done-admin-user-bills');
+
+    if (btnCloseUserBillsModal) btnCloseUserBillsModal.addEventListener('click', closeAdminUserBillsModal);
+    if (btnDoneUserBillsModal) btnDoneUserBillsModal.addEventListener('click', closeAdminUserBillsModal);
+    if (userBillsModal) {
+      userBillsModal.addEventListener('click', (e) => {
+        if (e.target === userBillsModal) closeAdminUserBillsModal();
+      });
+    }
   }
 
   function debounce(fn, ms) {
@@ -117,7 +186,7 @@
     const tableBody = document.getElementById('admin-users-tbody');
     if (!tableBody) return;
 
-    tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--color-text-muted);">加载用户数据...</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px; color:var(--color-text-muted);">加载用户数据...</td></tr>';
 
     const search = document.getElementById('admin-user-search')?.value || '';
     const role = document.getElementById('admin-role-filter')?.value || 'all';
@@ -175,13 +244,40 @@
           <td>${lastLoginDate}</td>
           <td>
             <div class="table-actions">
+              <button type="button" class="btn-table-action btn-view-user-bills" data-id="${u.id}" data-name="${u.name || u.email}">📜 账单</button>
+              <button type="button" class="btn-table-action btn-edit-user" data-id="${u.id}">✏️ 编辑</button>
               ${u.status === 'active' 
                 ? `<button type="button" class="btn-table-action btn-suspend" data-id="${u.id}" data-name="${u.name}">🧊 冻结</button>`
                 : `<button type="button" class="btn-table-action btn-activate" data-id="${u.id}" data-name="${u.name}">⚡ 激活</button>`
               }
+              ${!isCurrentAdmin ? `<button type="button" class="btn-table-action btn-delete-user" data-id="${u.id}" data-name="${u.name || u.email}" style="color:var(--danger,#ff453a); border-color:rgba(255,69,58,0.3);">🗑️ 删除</button>` : ''}
             </div>
           </td>
         `;
+
+        // View User Bills Modal Event
+        const viewBillsBtn = tr.querySelector('.btn-view-user-bills');
+        if (viewBillsBtn) {
+          viewBillsBtn.addEventListener('click', () => {
+            openAdminUserBillsModal(u.id, u.name || u.email);
+          });
+        }
+
+        // Edit User Modal Event
+        const editBtn = tr.querySelector('.btn-edit-user');
+        if (editBtn) {
+          editBtn.addEventListener('click', () => {
+            openAdminEditUserModal(u);
+          });
+        }
+
+        // Delete User Event
+        const deleteBtn = tr.querySelector('.btn-delete-user');
+        if (deleteBtn) {
+          deleteBtn.addEventListener('click', async () => {
+            await deleteUser(u.id, u.name || u.email);
+          });
+        }
 
         // Password Reveal Toggle Event
         const togglePwdBtn = tr.querySelector('.btn-toggle-pwd');
@@ -229,8 +325,138 @@
         tableBody.appendChild(tr);
       });
     } catch (err) {
-      tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px; color:#ff453a;">${err.message}</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:20px; color:#ff453a;">${err.message}</td></tr>`;
     }
+  }
+
+  async function deleteUser(userId, userName) {
+    if (!confirm(`⚠️ 危险操作确认：\n\n确定要永久删除用户 "${userName}" (#${userId}) 吗？\n该操作不可撤销！`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(getApiBaseUrl() + `/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '删除失败');
+
+      if (typeof window.showToast === 'function') {
+        window.showToast(`🗑️ 用户 ${userName} 已永久删除`);
+      }
+      loadUsersList();
+      loadUsersStats();
+    } catch (err) {
+      if (typeof window.showToast === 'function') {
+        window.showToast(`❌ 删除失败: ${err.message}`);
+      }
+    }
+  }
+
+  async function openAdminUserBillsModal(userId, userName) {
+    const modal = document.getElementById('admin-user-bills-modal');
+    if (!modal) return;
+
+    const headerName = document.getElementById('admin-user-bills-header-name');
+    const tbody = document.getElementById('admin-user-bills-tbody');
+    const kpiCount = document.getElementById('admin-user-kpi-count');
+    const kpiRevenue = document.getElementById('admin-user-kpi-revenue');
+    const kpiProfit = document.getElementById('admin-user-kpi-profit');
+
+    if (headerName) headerName.textContent = `${userName} (#${userId})`;
+    if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted);">正在加载该用户的账单数据...</td></tr>';
+    if (kpiCount) kpiCount.textContent = '0 笔';
+    if (kpiRevenue) kpiRevenue.textContent = 'RM 0.00';
+    if (kpiProfit) kpiProfit.textContent = 'RM 0.00';
+
+    modal.classList.remove('hidden');
+    document.body.classList.add('modal-open');
+
+    try {
+      const response = await fetch(getApiBaseUrl() + `/api/admin/users/${userId}/bills`, {
+        headers: getHeaders()
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || '获取用户账单失败');
+      }
+      const data = await response.json();
+      const bills = data.bills || [];
+
+      let totalRev = 0;
+      let totalProf = 0;
+      bills.forEach(b => {
+        totalRev += parseFloat(b.totalRevenue || 0);
+        totalProf += parseFloat(b.netProfit || 0);
+      });
+
+      if (kpiCount) kpiCount.textContent = `${bills.length} 笔`;
+      if (kpiRevenue) kpiRevenue.textContent = `RM ${totalRev.toFixed(2)}`;
+      if (kpiProfit) {
+        kpiProfit.textContent = `RM ${totalProf.toFixed(2)}`;
+        kpiProfit.className = 'kpi-value ' + (totalProf >= 0 ? 'tag-bullish' : 'tag-bearish');
+      }
+
+      if (tbody) {
+        if (bills.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted);">该用户暂无账单记录</td></tr>';
+        } else {
+          tbody.innerHTML = bills.map(b => {
+            const dt = b.createdAt ? new Date(b.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '--';
+            const profit = typeof b.netProfit === 'number' ? b.netProfit : parseFloat(b.netProfit || 0);
+            const playerFee = typeof b.playerFee === 'number' ? b.playerFee : parseFloat(b.playerFee || 0);
+            const duration = b.duration ? `${b.duration}h` : '2h';
+            const courtCount = b.courtCount ? `${b.courtCount}片` : '1片';
+            return `
+              <tr>
+                <td>#${b.id}</td>
+                <td style="font-weight:500;">${b.title}</td>
+                <td>${b.venueName || '--'}</td>
+                <td>${courtCount} (${duration})</td>
+                <td>${b.totalPlayers || 0}人 (Host ${b.hostCount || 0})</td>
+                <td>RM ${playerFee.toFixed(2)}</td>
+                <td style="color:${profit >= 0 ? 'var(--success)' : 'var(--danger)'}; font-weight:600;">RM ${profit.toFixed(2)}</td>
+                <td>${dt}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+      }
+    } catch (err) {
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px; color:#ff453a;">${err.message}</td></tr>`;
+      }
+    }
+  }
+
+  function closeAdminUserBillsModal() {
+    const modal = document.getElementById('admin-user-bills-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    document.body.classList.remove('modal-open');
+  }
+
+  function openAdminEditUserModal(user) {
+    const modal = document.getElementById('admin-edit-user-modal');
+    if (!modal) return;
+
+    document.getElementById('admin-edit-user-id').value = user.id;
+    document.getElementById('admin-edit-user-email').value = user.email || '';
+    document.getElementById('admin-edit-user-name').value = user.name || '';
+    document.getElementById('admin-edit-user-password').value = '';
+    document.getElementById('admin-edit-user-role').value = user.role || 'user';
+    document.getElementById('admin-edit-user-status').value = user.status || 'active';
+
+    modal.classList.remove('hidden');
+    document.body.classList.add('modal-open');
+  }
+
+  function closeAdminEditUserModal() {
+    const modal = document.getElementById('admin-edit-user-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    document.body.classList.remove('modal-open');
   }
 
   async function updateUserRoleOrStatus(userId, updateData) {

@@ -98,8 +98,18 @@
         courtledgerHeaderActions.classList.toggle('hidden', targetViewId !== 'courtledger');
       }
 
-      if (targetViewId === 'historybills') {
-        if (window.CourtLedgerUI && typeof window.CourtLedgerUI.renderBillsList === 'function') {
+      if (targetViewId === 'courtledger') {
+        if (window.CourtLedgerUI && typeof window.CourtLedgerUI.calculate === 'function') {
+          window.CourtLedgerUI.calculate();
+        }
+      } else if (targetViewId === 'historybills') {
+        if (window.CourtLedgerState && typeof window.CourtLedgerState.fetchBills === 'function') {
+          window.CourtLedgerState.fetchBills().then(() => {
+            if (window.CourtLedgerUI && typeof window.CourtLedgerUI.renderBillsList === 'function') {
+              window.CourtLedgerUI.renderBillsList();
+            }
+          });
+        } else if (window.CourtLedgerUI && typeof window.CourtLedgerUI.renderBillsList === 'function') {
           window.CourtLedgerUI.renderBillsList();
         }
       } else if (targetViewId === 'admin') {

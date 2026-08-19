@@ -28,58 +28,57 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: var(--space-4);
-  padding-top: max(var(--space-4), env(safe-area-inset-top));
-  padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  margin: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
   overflow-x: hidden;
 }
 
-/* App Container — Responsive Dual-Mode Container */
+/* App Container — Full-width flush layout */
 .app-container {
   width: 100%;
-  max-width: 520px;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
-  margin: 0 auto;
-  transition: max-width var(--transition);
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+}
+
+/* ── Header — Flush against window top and sides, no floating card box ── */
+.tv-header {
+  width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  padding-top: max(10px, env(safe-area-inset-top));
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  background: var(--surface);
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 @media (min-width: 900px) {
-  body {
-    padding: var(--space-6) var(--space-8);
-  }
-
-  .app-container {
-    max-width: 1240px;
-    gap: var(--space-6);
-  }
-
   .tv-header {
-    padding: var(--space-3) var(--space-5);
+    padding: 12px 24px;
   }
 
   .tv-title {
     font-size: 1.05rem;
   }
-}
-
-/* ── Header ── */
-.tv-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-3) var(--space-4);
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  position: relative;
-  z-index: 10;
 }
 
 .tv-logo-area {
@@ -341,9 +340,18 @@ body {
 /* ── App Views ── */
 .app-main-viewport {
   width: 100%;
-  max-width: 900px;
+  max-width: 600px;
   margin: 0 auto;
+  padding: var(--space-3) var(--space-3) var(--space-8);
   position: relative;
+  flex: 1;
+}
+
+@media (min-width: 900px) {
+  .app-main-viewport {
+    max-width: 1320px;
+    padding: var(--space-4) var(--space-6) var(--space-10);
+  }
 }
 
 .app-view {

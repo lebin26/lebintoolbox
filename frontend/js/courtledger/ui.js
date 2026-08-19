@@ -354,15 +354,22 @@
     }
 
     // Initialize Court Management Modal bindings
-    const billsUI = initCourtManagementModal(calculate);
+    const courtUI = initCourtManagementModal(calculate);
 
     calculate();
 
-    return {
+    const controller = {
       calculate,
-      openBillsModal: billsUI ? billsUI.openBillsModal : null,
-      renderBillsList: billsUI ? billsUI.renderModalBillsList : null
+      openBillsModal: courtUI ? courtUI.openBillsModal : null,
+      renderBillsList: courtUI ? courtUI.renderModalBillsList : null,
+      renderModalVenuesList: courtUI ? courtUI.renderModalVenuesList : null
     };
+
+    window.CourtLedgerUI.calculate = calculate;
+    window.CourtLedgerUI.renderBillsList = controller.renderBillsList;
+    window.CourtLedgerUI.renderModalVenuesList = controller.renderModalVenuesList;
+
+    return controller;
   }
 
   // Bindings for Court Database Management Modal
@@ -543,7 +550,12 @@
     }
 
     // Initialize Save Bill & History Bills UI
-    return initBillsHistoryUI(calculateCallback);
+    const billsUI = initBillsHistoryUI(calculateCallback);
+    return {
+      openModal,
+      renderModalVenuesList,
+      ...billsUI
+    };
   }
 
   function initBillsHistoryUI(calculateCallback) {
@@ -785,7 +797,8 @@
           if (matchedVenue && window.CourtLedgerCalc) {
             const mRate = typeof matchedVenue.rateMorning === 'number' ? matchedVenue.rateMorning : parseFloat(matchedVenue.rateMorning);
             const eRate = typeof matchedVenue.rateEvening === 'number' ? matchedVenue.rateEvening : parseFloat(matchedVenue.rateEvening);
-            courtFee = window.CourtLedgerCalc.calculateCourtFee(16, duration, mRate, eRate) * courtCount;
+            const courtRes = window.CourtLedgerCalc.calculateCourtFee(16, duration, mRate, eRate, courtCount);
+            courtFee = courtRes.fee;
           }
         }
         
@@ -902,14 +915,6 @@
         openBillsModal();
       });
     }
-    if (btnCloseBillsModal) {
-      btnCloseBillsModal.addEventListener('click', closeBillsModal);
-    }
-    if (billsModal) {
-      billsModal.addEventListener('click', (e) => {
-        if (e.target === billsModal) closeBillsModal();
-      });
-    }
     if (billsSearchInput) {
       billsSearchInput.addEventListener('input', () => {
         renderModalBillsList();
@@ -924,5 +929,11 @@
     return { openBillsModal, renderModalBillsList };
   }
 
-  window.CourtLedgerUI = { triggerSpark, initCourtLedgerUI };
+  window.CourtLedgerUI = {
+    triggerSpark,
+    initCourtLedgerUI,
+    calculate: null,
+    renderBillsList: null,
+    renderModalVenuesList: null
+  };
 })();

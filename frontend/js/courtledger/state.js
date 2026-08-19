@@ -4,11 +4,38 @@
  */
 
 (function () {
-  let venues = [];
+  const DEFAULT_VENUES = [
+    { id: 1, name: 'Lavana Sport Center Setapak', rateMorning: 14.84, rateEvening: 29.68 },
+    { id: 2, name: 'Setapak Badminton Center (SBC)', rateMorning: 14.00, rateEvening: 28.00 },
+    { id: 12, name: 'TARUMT Sport Complex', rateMorning: 0.00, rateEvening: 0.00 }
+  ];
+  const LOCAL_VENUES_KEY = 'courtledger_cached_venues';
+
+  function getCachedVenues() {
+    try {
+      const raw = localStorage.getItem(LOCAL_VENUES_KEY);
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list) && list.length > 0) {
+          const hasMock = list.some(v => v.name && (v.name.includes('Sentul') || v.name.includes('Pro One') || v.name.includes('标准场地 (默认)')));
+          if (!hasMock) return list;
+        }
+      }
+    } catch (e) {}
+    return [...DEFAULT_VENUES];
+  }
+
+  function saveCachedVenues(list) {
+    try {
+      localStorage.setItem(LOCAL_VENUES_KEY, JSON.stringify(list));
+    } catch (e) {}
+  }
+
+  let venues = getCachedVenues();
 
   let selectedVenueIndex = 0;
-  let rateMorning = 0.0;
-  let rateEvening = 0.0;
+  let rateMorning = 14.84;
+  let rateEvening = 29.68;
 
   let onVenueChangeCallback = null;
 
@@ -16,7 +43,11 @@
     if (window.WORKER_API_URL) return window.WORKER_API_URL.replace(/\/$/, '');
 
     // Auto-detect local testing or Cloudflare Workers same-origin deployment
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.endsWith('workers.dev') || window.location.hostname.endsWith('pages.dev')) {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://127.0.0.1:8787';
+    }
+
+    if (window.location.hostname.endsWith('workers.dev') || window.location.hostname.endsWith('pages.dev')) {
       return '';
     }
 
@@ -25,23 +56,21 @@
   }
 
   function getActiveRates() {
-    const v = venues[selectedVenueIndex] || venues[0];
+    const v = venues[selectedVenueIndex] || venues[0] || DEFAULT_VENUES[0];
     return {
-      venueName: v ? v.name : '球场库为空',
-      rateMorning: v ? (typeof v.rateMorning === 'number' ? v.rateMorning : parseFloat(v.rateMorning)) : 0,
-      rateEvening: v ? (typeof v.rateEvening === 'number' ? v.rateEvening : parseFloat(v.rateEvening)) : 0
+      venueName: v ? v.name : '标准场地',
+      rateMorning: v ? (typeof v.rateMorning === 'number' ? v.rateMorning : (parseFloat(v.rateMorning) || 14.84)) : 14.84,
+      rateEvening: v ? (typeof v.rateEvening === 'number' ? v.rateEvening : (parseFloat(v.rateEvening) || 29.68)) : 29.68
     };
   }
 
   function updateActiveVenueRates() {
-    const v = venues[selectedVenueIndex] || venues[0];
-    if (v) {
-      rateMorning = typeof v.rateMorning === 'number' ? v.rateMorning : parseFloat(v.rateMorning);
-      rateEvening = typeof v.rateEvening === 'number' ? v.rateEvening : parseFloat(v.rateEvening);
-      const venueRateBadge = document.getElementById('venue-rate-badge');
-      if (venueRateBadge) {
-        venueRateBadge.textContent = `🌞 RM ${rateMorning.toFixed(2)} / 🌙 RM ${rateEvening.toFixed(2)}`;
-      }
+    const rates = getActiveRates();
+    rateMorning = rates.rateMorning;
+    rateEvening = rates.rateEvening;
+    const venueRateBadge = document.getElementById('venue-rate-badge');
+    if (venueRateBadge) {
+      venueRateBadge.textContent = `🌞 RM ${rateMorning.toFixed(2)} / 🌙 RM ${rateEvening.toFixed(2)}`;
     }
     if (typeof onVenueChangeCallback === 'function') {
       onVenueChangeCallback();
@@ -77,11 +106,16 @@
       const data = await response.json();
       if (data && Array.isArray(data.venues) && data.venues.length > 0) {
         venues = data.venues;
+        saveCachedVenues(venues);
         populateVenueSelect();
         return venues;
       }
     } catch (err) {
-      console.warn('⚠️ Cloudflare Worker / D1 Database API unavailable:', err.message);
+      console.warn('⚠️ Cloudflare Worker / D1 Database API unavailable, using cached venues:', err.message);
+    }
+    if (!venues || venues.length === 0) {
+      venues = getCachedVenues();
+      populateVenueSelect();
     }
     return venues;
   }
@@ -139,6 +173,7 @@
         rateEvening: parseFloat(rateEvening)
       };
       venues.push(newVenue);
+      saveCachedVenues(venues);
       selectedVenueIndex = venues.length - 1;
       populateVenueSelect();
       return { venue: newVenue, warning: '已保存在当前会话（离线模式）' };
@@ -165,6 +200,7 @@
         venues[idx].name = name.trim();
         venues[idx].rateMorning = parseFloat(rateMorning);
         venues[idx].rateEvening = parseFloat(rateEvening);
+        saveCachedVenues(venues);
         populateVenueSelect();
       }
       return { warning: '已在本地更新（离线模式）' };
@@ -186,6 +222,7 @@
       return data;
     } catch (err) {
       venues = venues.filter(v => v.id !== id);
+      saveCachedVenues(venues);
       selectedVenueIndex = 0;
       populateVenueSelect();
       return { warning: '已在本地删除（离线模式）' };
@@ -194,45 +231,39 @@
 
   let savedBills = [];
 
-  const LOCAL_BILLS_KEY = 'courtledger_saved_bills';
+  function getUserBillsKey() {
+    const uid = window.AuthManager && window.AuthManager.user ? window.AuthManager.user.id : 'guest';
+    return 'courtledger_saved_bills_u' + uid;
+  }
 
   function getLocalBills() {
-    const keys = ['courtledger_saved_bills', 'courtledger_bills', 'courtledger_history_bills', 'bills_history'];
-    const merged = [];
-    const seen = new Set();
-    keys.forEach(k => {
-      try {
-        const raw = localStorage.getItem(k);
-        if (raw) {
-          const list = JSON.parse(raw);
-          if (Array.isArray(list)) {
-            list.forEach(item => {
-              if (item) {
-                const keyStr = item.id ? String(item.id) : (item.title + '_' + (item.createdAt || ''));
-                if (!seen.has(keyStr)) {
-                  seen.add(keyStr);
-                  merged.push(item);
-                }
-              }
-            });
-          }
-        }
-      } catch (e) {}
-    });
-    return merged;
+    try {
+      const raw = localStorage.getItem(getUserBillsKey());
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) return list;
+      }
+    } catch (e) {}
+    return [];
   }
 
   function saveLocalBills(list) {
     try {
-      localStorage.setItem(LOCAL_BILLS_KEY, JSON.stringify(list));
+      localStorage.setItem(getUserBillsKey(), JSON.stringify(list));
     } catch (e) {}
+  }
+
+  function getAuthHeaderObj() {
+    return window.AuthManager ? window.AuthManager.getAuthHeaders() : { 'Content-Type': 'application/json' };
   }
 
   async function fetchBills() {
     let apiBills = [];
     try {
       const endpoint = getApiBaseUrl() + '/api/bills';
-      const response = await fetch(endpoint);
+      const response = await fetch(endpoint, {
+        headers: getAuthHeaderObj()
+      });
       if (response.ok) {
         const data = await response.json();
         if (data && Array.isArray(data.bills)) {
@@ -279,7 +310,7 @@
       const endpoint = getApiBaseUrl() + '/api/bills';
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaderObj(),
         body: JSON.stringify(billData)
       });
       const data = await response.json();
@@ -294,6 +325,7 @@
       newBill = {
         ...billData,
         id: Date.now(),
+        userId: window.AuthManager && window.AuthManager.user ? window.AuthManager.user.id : null,
         createdAt: new Date().toISOString()
       };
     }
@@ -308,7 +340,7 @@
       const endpoint = getApiBaseUrl() + `/api/bills/${id}`;
       await fetch(endpoint, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaderObj(),
         body: JSON.stringify(billData)
       });
     } catch (err) {
@@ -326,7 +358,10 @@
   async function deleteBill(id) {
     try {
       const endpoint = getApiBaseUrl() + `/api/bills/${id}`;
-      await fetch(endpoint, { method: 'DELETE' });
+      await fetch(endpoint, {
+        method: 'DELETE',
+        headers: getAuthHeaderObj()
+      });
     } catch (err) {
       console.warn('⚠️ Delete bill on worker failed, fallback to local storage:', err.message);
     }

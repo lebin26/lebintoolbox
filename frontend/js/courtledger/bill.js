@@ -103,10 +103,11 @@
             break;
           }
         }
+        if (courtCount === 0) courtCount = 1;
 
         const rates = window.CourtLedgerState ? window.CourtLedgerState.getActiveRates() : { venueName: '标准场地', rateMorning: 14.84, rateEvening: 29.68 };
-        const { fee: baseCourtFee } = window.CourtLedgerCalc.calculateCourtFee(startHour, duration, rates.rateMorning, rates.rateEvening);
-        const courtFee = baseCourtFee * courtCount;
+        const courtRes = window.CourtLedgerCalc.calculateCourtFee(startHour, duration, rates.rateMorning, rates.rateEvening, courtCount);
+        const courtFee = courtRes.fee;
 
         const calcRes = window.CourtLedgerCalc.computeFeeAndBreakdown(
           courtFee, shuttlesUsed, shuttlePrice, totalPlayers, hostCount, additionalShuttles

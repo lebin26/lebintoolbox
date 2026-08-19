@@ -2,23 +2,33 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 // Pure calculation logic extracted for Node test runner
-function calculateCourtFee(startHour, duration, rateMorning, rateEvening) {
+function calculateCourtFee(startHour, duration, rateMorning, rateEvening, courtCount = 1) {
   let totalFee = 0;
-  let hasMorning = false;
-  let hasEvening = false;
+  let morningHours = 0;
+  let eveningHours = 0;
 
   for (let h = 0; h < duration; h++) {
     const hourOfDay = (startHour + h) % 24;
     if (hourOfDay >= 0 && hourOfDay < 18) {
       totalFee += rateMorning;
-      hasMorning = true;
+      morningHours++;
     } else {
       totalFee += rateEvening;
-      hasEvening = true;
+      eveningHours++;
     }
   }
 
-  return { fee: totalFee, hasMorning, hasEvening };
+  const courts = Math.max(1, parseInt(courtCount) || 1);
+  const totalFeeAllCourts = totalFee * courts;
+
+  return {
+    fee: totalFeeAllCourts,
+    singleCourtFee: totalFee,
+    morningHours,
+    eveningHours,
+    hasMorning: morningHours > 0,
+    hasEvening: eveningHours > 0
+  };
 }
 
 function calculateRequiredHostShuttles(courtFee, shuttlesUsed, shuttlePrice, totalPlayers, hostCount) {
@@ -59,9 +69,12 @@ test('calculateCourtFee - evening rate only', () => {
   assert.equal(res.hasEvening, true);
 });
 
-test('calculateCourtFee - cross morning and evening rate', () => {
-  const res = calculateCourtFee(17, 2, 14.0, 28.0);
-  assert.equal(res.fee, 42.0); // 14 (17:00-18:00) + 28 (18:00-19:00)
+test('calculateCourtFee - cross morning and evening rate with 2 courts', () => {
+  const res = calculateCourtFee(17, 2, 14.0, 28.0, 2);
+  assert.equal(res.singleCourtFee, 42.0);
+  assert.equal(res.fee, 84.0);
+  assert.equal(res.morningHours, 1);
+  assert.equal(res.eveningHours, 1);
   assert.equal(res.hasMorning, true);
   assert.equal(res.hasEvening, true);
 });
