@@ -809,40 +809,148 @@ html[data-theme="light"] .admin-header-banner .db-status-badge {
 @media (max-width: 820px) {
   .admin-layout-wrapper {
     flex-direction: column;
-    gap: var(--space-3);
-  }
-
-  .admin-sidebar {
+    min-height: auto;
     width: 100%;
-    position: static;
-    padding: var(--space-3);
-    gap: var(--space-2);
+    gap: 0;
   }
 
-  .admin-sidebar-header {
-    display: none;
+  .admin-sidebar,
+  .admin-sidebar.collapsed {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    height: auto !important;
+    position: sticky !important;
+    top: 48px !important;
+    padding: 8px 12px !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border-subtle) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    background: rgba(16, 16, 22, 0.96) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    z-index: 30 !important;
+    gap: 0 !important;
+  }
+
+  html[data-theme="light"] .admin-sidebar,
+  html[data-theme="light"] .admin-sidebar.collapsed {
+    background: rgba(255, 255, 255, 0.96) !important;
+    border-bottom-color: rgba(217, 119, 6, 0.2) !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06) !important;
+  }
+
+  .admin-sidebar-header,
+  .admin-sidebar-footer,
+  .admin-sidebar.collapsed .admin-sidebar-header,
+  .admin-sidebar.collapsed .admin-sidebar-footer {
+    display: none !important;
   }
 
   .admin-vertical-tabs {
-    flex-direction: row;
-    overflow-x: auto;
-    gap: var(--space-2);
-    padding-bottom: 2px;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    gap: 8px !important;
+    padding: 2px 0 !important;
+    width: 100% !important;
   }
 
-  .admin-tab-btn {
-    width: auto;
-    padding: var(--space-2) var(--space-3);
-    font-size: 0.82rem;
+  .admin-vertical-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-tab-btn,
+  .admin-sidebar.collapsed .admin-tab-btn {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: auto !important;
+    min-width: max-content !important;
+    height: 38px !important;
+    padding: 0 16px !important;
+    border-radius: 20px !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
+    transform: none !important;
+    font-size: 0.82rem !important;
+  }
+
+  .admin-tab-btn .tab-icon,
+  .admin-sidebar.collapsed .admin-tab-btn .tab-icon {
+    font-size: 1.05rem !important;
+    margin: 0 6px 0 0 !important;
+    line-height: 1 !important;
+  }
+
+  .admin-tab-btn .tab-label,
+  .admin-sidebar.collapsed .admin-tab-btn .tab-label {
+    display: inline-block !important;
+    opacity: 1 !important;
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+    max-width: none !important;
   }
 
   .admin-tab-btn:hover,
-  .admin-tab-btn.active {
-    transform: none;
+  .admin-tab-btn.active,
+  .admin-sidebar.collapsed .admin-tab-btn.active {
+    transform: none !important;
   }
 
-  .admin-sidebar-footer {
-    display: none;
+  .admin-main-content {
+    padding: 14px 12px 48px 12px !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    gap: 12px !important;
+  }
+
+  .admin-header-banner {
+    padding: 12px 14px !important;
+    border-radius: var(--radius-md) !important;
+  }
+
+  .admin-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .admin-toolbar {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  .admin-toolbar input,
+  .admin-toolbar select {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .admin-app-sections-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .admin-table-wrapper {
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    border-radius: var(--radius-md) !important;
+  }
+
+  .admin-data-table {
+    min-width: 560px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .admin-data-table th,
+  .admin-data-table td {
+    padding: 8px 10px !important;
   }
 }
 
