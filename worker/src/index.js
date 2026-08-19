@@ -125,6 +125,24 @@ export default {
 
     try {
       // -------------------------------------------------------------
+      // 0. ROOT HEALTH CHECK & STATUS ENDPOINT
+      // -------------------------------------------------------------
+      if (method === 'GET' && (path === '/' || path === '/api' || path === '/health')) {
+        return jsonResponse({
+          status: 'ok',
+          service: 'HostCalculator API Worker',
+          version: '1.0.0',
+          endpoints: [
+            '/api/venues',
+            '/api/bills',
+            '/api/auth/login',
+            '/api/auth/register',
+            '/api/admin/dashboard'
+          ]
+        });
+      }
+
+      // -------------------------------------------------------------
       // 1. AUTHENTICATION API ENDPOINTS
       // -------------------------------------------------------------
 
