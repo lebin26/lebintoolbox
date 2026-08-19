@@ -78,12 +78,16 @@
       if (data && Array.isArray(data.venues) && data.venues.length > 0) {
         venues = data.venues;
         populateVenueSelect();
-        return true;
+        return venues;
       }
     } catch (err) {
       console.warn('⚠️ Cloudflare Worker / D1 Database API unavailable:', err.message);
     }
-    return false;
+    return venues;
+  }
+
+  async function fetchVenues() {
+    return await fetchVenuesFromDatabase();
   }
 
   async function initVenueState(onChange) {
@@ -340,6 +344,7 @@
     populateVenueSelect,
     initVenueState,
     fetchVenuesFromDatabase,
+    fetchVenues,
     addVenue,
     updateVenue,
     deleteVenue,

@@ -344,23 +344,32 @@
 
     // 1. Fetch and render Venues
     try {
-      if (window.CourtLedgerState && typeof window.CourtLedgerState.fetchVenues === 'function') {
-        const venues = await window.CourtLedgerState.fetchVenues();
-        if (totalVenuesEl) totalVenuesEl.textContent = `${venues.length} 间`;
+      let venues = [];
+      if (window.CourtLedgerState) {
+        if (typeof window.CourtLedgerState.fetchVenues === 'function') {
+          venues = await window.CourtLedgerState.fetchVenues();
+        } else if (typeof window.CourtLedgerState.fetchVenuesFromDatabase === 'function') {
+          await window.CourtLedgerState.fetchVenuesFromDatabase();
+          venues = window.CourtLedgerState.venues || [];
+        } else if (Array.isArray(window.CourtLedgerState.venues)) {
+          venues = window.CourtLedgerState.venues;
+        }
+      }
 
-        if (venuesTbody) {
-          if (venues.length === 0) {
-            venuesTbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:12px; color:var(--color-text-muted);">暂无球场数据</td></tr>';
-          } else {
-            venuesTbody.innerHTML = venues.map(v => `
-              <tr>
-                <td>#${v.id}</td>
-                <td><strong>${v.name}</strong></td>
-                <td>RM ${(typeof v.rateMorning === 'number' ? v.rateMorning : parseFloat(v.rateMorning || 0)).toFixed(2)}</td>
-                <td>RM ${(typeof v.rateEvening === 'number' ? v.rateEvening : parseFloat(v.rateEvening || 0)).toFixed(2)}</td>
-              </tr>
-            `).join('');
-          }
+      if (totalVenuesEl) totalVenuesEl.textContent = `${venues.length} 间`;
+
+      if (venuesTbody) {
+        if (venues.length === 0) {
+          venuesTbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:12px; color:var(--text-muted);">暂无球场数据</td></tr>';
+        } else {
+          venuesTbody.innerHTML = venues.map(v => `
+            <tr>
+              <td>#${v.id}</td>
+              <td><strong>${v.name}</strong></td>
+              <td>RM ${(typeof v.rateMorning === 'number' ? v.rateMorning : parseFloat(v.rateMorning || 0)).toFixed(2)}</td>
+              <td>RM ${(typeof v.rateEvening === 'number' ? v.rateEvening : parseFloat(v.rateEvening || 0)).toFixed(2)}</td>
+            </tr>
+          `).join('');
         }
       }
     } catch (e) {
@@ -369,38 +378,44 @@
 
     // 2. Fetch and render Bills
     try {
-      if (window.CourtLedgerState && typeof window.CourtLedgerState.fetchBills === 'function') {
-        const bills = await window.CourtLedgerState.fetchBills();
-        if (totalBillsEl) totalBillsEl.textContent = `${bills.length} 笔`;
+      let bills = [];
+      if (window.CourtLedgerState) {
+        if (typeof window.CourtLedgerState.fetchBills === 'function') {
+          bills = await window.CourtLedgerState.fetchBills();
+        } else if (Array.isArray(window.CourtLedgerState.savedBills)) {
+          bills = window.CourtLedgerState.savedBills;
+        }
+      }
 
-        let totalRev = 0;
-        let totalProf = 0;
-        bills.forEach(b => {
-          totalRev += parseFloat(b.totalRevenue || 0);
-          totalProf += parseFloat(b.netProfit || 0);
-        });
+      if (totalBillsEl) totalBillsEl.textContent = `${bills.length} 笔`;
 
-        if (totalRevenueEl) totalRevenueEl.textContent = `RM ${totalRev.toFixed(2)}`;
-        if (totalProfitEl) totalProfitEl.textContent = `RM ${totalProf.toFixed(2)}`;
+      let totalRev = 0;
+      let totalProf = 0;
+      bills.forEach(b => {
+        totalRev += parseFloat(b.totalRevenue || 0);
+        totalProf += parseFloat(b.netProfit || 0);
+      });
 
-        if (billsTbody) {
-          if (bills.length === 0) {
-            billsTbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:12px; color:var(--color-text-muted);">暂无账单流水</td></tr>';
-          } else {
-            billsTbody.innerHTML = bills.slice(0, 10).map(b => {
-              const dt = b.createdAt ? new Date(b.createdAt).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) : '--';
-              return `
-                <tr>
-                  <td>#${b.id}</td>
-                  <td style="max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${b.title}">${b.title}</td>
-                  <td>${b.venueName || '--'}</td>
-                  <td>RM ${(typeof b.playerFee === 'number' ? b.playerFee : parseFloat(b.playerFee || 0)).toFixed(2)}</td>
-                  <td style="color:${(b.netProfit >= 0 ? 'var(--success)' : 'var(--danger)')}; font-weight:600;">RM ${(typeof b.netProfit === 'number' ? b.netProfit : parseFloat(b.netProfit || 0)).toFixed(2)}</td>
-                  <td>${dt}</td>
-                </tr>
-              `;
-            }).join('');
-          }
+      if (totalRevenueEl) totalRevenueEl.textContent = `RM ${totalRev.toFixed(2)}`;
+      if (totalProfitEl) totalProfitEl.textContent = `RM ${totalProf.toFixed(2)}`;
+
+      if (billsTbody) {
+        if (bills.length === 0) {
+          billsTbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:12px; color:var(--text-muted);">暂无账单流水</td></tr>';
+        } else {
+          billsTbody.innerHTML = bills.slice(0, 10).map(b => {
+            const dt = b.createdAt ? new Date(b.createdAt).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) : '--';
+            return `
+              <tr>
+                <td>#${b.id}</td>
+                <td style="max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${b.title}">${b.title}</td>
+                <td>${b.venueName || '--'}</td>
+                <td>RM ${(typeof b.playerFee === 'number' ? b.playerFee : parseFloat(b.playerFee || 0)).toFixed(2)}</td>
+                <td style="color:${(b.netProfit >= 0 ? 'var(--success)' : 'var(--danger)')}; font-weight:600;">RM ${(typeof b.netProfit === 'number' ? b.netProfit : parseFloat(b.netProfit || 0)).toFixed(2)}</td>
+                <td>${dt}</td>
+              </tr>
+            `;
+          }).join('');
         }
       }
     } catch (e) {
