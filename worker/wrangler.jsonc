@@ -6,6 +6,10 @@
   "observability": {
     "enabled": true
   },
+  "assets": {
+    "directory": "../frontend",
+    "binding": "ASSETS"
+  },
   "d1_databases": [
     {
       "binding": "DB",

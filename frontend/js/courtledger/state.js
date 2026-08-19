@@ -15,12 +15,12 @@
   function getApiBaseUrl() {
     if (window.WORKER_API_URL) return window.WORKER_API_URL.replace(/\/$/, '');
 
-    // Auto-detect local testing environment (use relative endpoint to leverage Vite proxy)
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    // Auto-detect local testing or Cloudflare Workers same-origin deployment
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.endsWith('workers.dev') || window.location.hostname.endsWith('pages.dev')) {
       return '';
     }
 
-    // Default production Cloudflare Worker API endpoint
+    // Default production Cloudflare Worker API endpoint fallback (e.g. for GitHub Pages)
     return 'https://hostcalculator-worker.lebin2626.workers.dev';
   }
 

@@ -119,15 +119,20 @@ export default {
     const path = url.pathname;
     const method = request.method;
 
+    // -------------------------------------------------------------
+    // 0. STATIC ASSETS & HEALTH CHECK
+    // -------------------------------------------------------------
+    // Pass non-API static asset requests to Cloudflare Workers Assets
+    if (!path.startsWith('/api') && path !== '/health' && env.ASSETS) {
+      return env.ASSETS.fetch(request);
+    }
+
     if (!env.DB) {
       return errorResponse('D1 database binding "DB" is missing in wrangler.jsonc', 500);
     }
 
     try {
-      // -------------------------------------------------------------
-      // 0. ROOT HEALTH CHECK & STATUS ENDPOINT
-      // -------------------------------------------------------------
-      if (method === 'GET' && (path === '/' || path === '/api' || path === '/health')) {
+      if (method === 'GET' && (path === '/health' || (path === '/' && !env.ASSETS) || path === '/api')) {
         return jsonResponse({
           status: 'ok',
           service: 'HostCalculator API Worker',
