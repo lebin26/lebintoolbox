@@ -1,12 +1,12 @@
 /**
- * Court Ledger - Core Router Module
+ * OmniBox - Core Router Module
  * Handles multi-view switching and hash URL navigation.
  */
 
 (function () {
   const viewTitles = {
     login: 'Account Login',
-    hub: 'LEBIN_26',
+    hub: 'OmniBox',
     courtledger: 'Court Ledger',
     historybills: 'History Bills',
     admin: 'Admin Dashboard'
@@ -67,7 +67,7 @@
       });
 
       if (headerAppTitle) {
-        headerAppTitle.textContent = viewTitles[targetViewId] || 'LEBIN_26';
+        headerAppTitle.textContent = viewTitles[targetViewId] || 'OmniBox';
       }
 
       if (backToHubBtn) {
@@ -80,9 +80,9 @@
             if (targetViewId === 'historybills') {
               btnText.textContent = 'Court Ledger';
             } else if (targetViewId === 'admin') {
-              btnText.textContent = previousViewId === 'courtledger' ? 'Court Ledger' : 'Tools';
+              btnText.textContent = previousViewId === 'courtledger' ? 'Court Ledger' : 'OmniBox';
             } else {
-              btnText.textContent = 'Back';
+              btnText.textContent = 'OmniBox';
             }
           }
         }

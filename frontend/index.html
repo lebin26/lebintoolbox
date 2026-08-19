@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="format-detection" content="telephone=no">
-  <title>Court Ledger | 羽球 AA 算账与实用工具箱</title>
+  <title>OmniBox | Court Ledger</title>
   <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
 
   <!-- Direct CSS Module Loading (Guarantees zero import delays or protocol blocks) -->
@@ -25,9 +25,9 @@
       <div class="tv-logo-area">
         <button id="back-to-hub-btn" class="nav-back-btn hidden" title="back">
           <span class="btn-icon">←</span>
-          <span class="btn-text">Back</span>
+          <span class="btn-text">OmniBox</span>
         </button>
-        <span id="header-app-title" class="tv-title">Tools</span>
+        <span id="header-app-title" class="tv-title">OmniBox</span>
       </div>
       <div class="tv-header-actions">
         <!-- 1. Hub View Header Actions (主页专属设置: 账号信息 + 主题模式) -->
@@ -138,17 +138,22 @@
       <!-- VIEW 1: TOOLBOX HUB (Categorized View: views/hub.html) -->
       <div id="view-hub" class="app-view active">
         <section class="shortcuts-grid" id="tool-grid">
-          <!-- Admin Console Card (First app card, visible ONLY for admin account) -->
-          <div id="hub-admin-card" class="shortcut-card shortcut-purple hidden" data-target-view="admin">
+          <!-- Admin Console Card (Exclusive VIP Master Card, visible ONLY for admin account) -->
+          <div id="hub-admin-card" class="shortcut-card shortcut-admin-exclusive hidden" data-target-view="admin">
             <div class="shortcut-top">
-              <div class="shortcut-icon-circle">
+              <div class="shortcut-icon-circle admin-icon-glow">
                 <span class="shortcut-icon">👑</span>
               </div>
-              <span class="shortcut-pill-badge">ADMIN</span>
+              <div class="admin-badge-group">
+                <span class="shortcut-pill-badge badge-master">⚡ SUPER ADMIN</span>
+              </div>
             </div>
             <div class="shortcut-bottom">
-              <h2 class="shortcut-title">Admin Console</h2>
-              <span class="shortcut-subtitle">系统控制台与用户权限管理</span>
+              <div class="admin-title-row">
+                <h2 class="shortcut-title admin-title-gradient">Admin Console</h2>
+                <span class="admin-tag-pro">MASTER</span>
+              </div>
+              <span class="shortcut-subtitle">全系统唯一控制中心 · 权限治理与安全审计</span>
             </div>
           </div>
 
@@ -524,8 +529,8 @@
         <div class="login-card">
           <div class="login-header">
             <div class="login-badge">🛡️ 统一账号与 RBAC 鉴权系统</div>
-            <h2 class="login-title">欢迎登录 HostCalculator</h2>
-            <p class="login-subtitle">一个账号，即可使用羽球账单计算器与系统管理后台</p>
+            <h2 class="login-title">欢迎登录 OmniBox</h2>
+            <p class="login-subtitle">一个账号，畅享 OmniBox 全功能应用与系统管理后台</p>
           </div>
 
           <!-- Auth Tab Switcher -->
@@ -574,23 +579,56 @@
       <!-- VIEW 4: ADMIN DASHBOARD & SYSTEM MANAGEMENT -->
       <!-- ========================================== -->
       <div id="view-admin" class="app-view admin-view-container hidden">
-        <div class="admin-dashboard-card">
-          <div class="admin-header-banner">
-            <div>
-              <h2 class="admin-page-title">👑 Admin 系统后台控制中心</h2>
-              <span class="db-status-badge">⚡ Cloudflare Worker RBAC & D1 Database Protection</span>
+        <div class="admin-layout-wrapper">
+          <!-- Left Vertical Sidebar Tabs -->
+          <aside class="admin-sidebar" id="admin-sidebar">
+            <div class="admin-sidebar-header">
+              <div class="admin-sidebar-badge">
+                <span class="admin-sidebar-crown">👑</span>
+                <div class="admin-sidebar-brand">
+                  <span class="admin-sidebar-title">OmniBox Admin</span>
+                  <span class="admin-sidebar-sub">Master Console</span>
+                </div>
+              </div>
+              <button type="button" id="admin-sidebar-toggle-btn" class="admin-sidebar-toggle-btn" title="展开/收起侧边栏">
+                <span class="toggle-icon">☰</span>
+              </button>
             </div>
-          </div>
 
-          <!-- Admin Navigation Tabs: Clean Segmented Tab Control -->
-          <div class="admin-tabs-bar">
-            <button type="button" class="admin-tab-btn active" data-tab="users">👥 用户信息管理</button>
-            <button type="button" class="admin-tab-btn" data-tab="app-courtledger">🏸 Court Ledger 后台</button>
-            <button type="button" class="admin-tab-btn" data-tab="logs">📜 审计操作日志</button>
-          </div>
+            <nav class="admin-vertical-tabs admin-tabs-bar">
+              <button type="button" class="admin-tab-btn active" data-tab="users" title="用户信息管理">
+                <span class="tab-icon">👥</span>
+                <span class="tab-label">用户信息管理</span>
+              </button>
+              <button type="button" class="admin-tab-btn" data-tab="app-courtledger" title="Court Ledger 后台">
+                <span class="tab-icon">🏸</span>
+                <span class="tab-label">Court Ledger 后台</span>
+              </button>
+              <button type="button" class="admin-tab-btn" data-tab="logs" title="审计操作日志">
+                <span class="tab-icon">📜</span>
+                <span class="tab-label">审计操作日志</span>
+              </button>
+            </nav>
 
-          <!-- Tab 1: Users Management (用户信息管理 - 独立用户数据与状态管理) -->
-          <div id="admin-tab-users" class="admin-tab-panel">
+            <div class="admin-sidebar-footer">
+              <div class="admin-system-chip">
+                <span class="status-dot"></span>
+                <span class="chip-text">Worker RBAC & D1</span>
+              </div>
+            </div>
+          </aside>
+
+          <!-- Right Main Content Area -->
+          <section class="admin-main-content">
+            <div class="admin-header-banner">
+              <div>
+                <h2 class="admin-page-title">👑 Admin 系统后台控制中心</h2>
+                <span class="db-status-badge">⚡ Cloudflare Worker RBAC & D1 Database Protection</span>
+              </div>
+            </div>
+
+            <!-- Tab 1: Users Management (用户信息管理 - 独立用户数据与状态管理) -->
+            <div id="admin-tab-users" class="admin-tab-panel">
             <!-- User Stats KPI Grid -->
             <div class="kpi-grid admin-kpi-grid" style="margin-bottom: var(--space-4);">
               <div class="kpi-card">
@@ -764,8 +802,9 @@
               </table>
             </div>
           </div>
-        </div>
+        </section>
       </div>
+    </div>
 
     </main>
   </div>

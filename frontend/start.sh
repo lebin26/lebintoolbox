@@ -3,6 +3,6 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROOT_DIR="$DIR/.."
 
-echo "🔥 正在启动 HostCalculator 热更新全栈开发环境 (Vite + Wrangler)..."
+echo "🔥 正在启动 OmniBox 热更新全栈开发环境 (Vite + Wrangler)..."
 cd "$ROOT_DIR" && npm run dev
 

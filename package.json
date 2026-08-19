@@ -1,7 +1,7 @@
 {
-  "name": "host-calculator",
+  "name": "omnibox",
   "version": "1.0.0",
-  "description": "Court Ledger - 羽毛球 AA 算账与实用工具箱 (Cloudflare Worker API & D1 数据库)",
+  "description": "OmniBox - 多功能应用聚合平台 (Featuring Court Ledger)",
   "private": true,
   "scripts": {
     "dev": "concurrently -n \"frontend,worker\" -c \"cyan,magenta\" \"npm run dev:frontend\" \"npm run dev:worker\"",
@@ -9,6 +9,8 @@
     "dev:worker": "cd worker && npx wrangler dev",
     "start": "npm run dev",
     "test": "node --test tests/*.test.mjs",
+    "test:unit": "node --test tests/api_schema.test.mjs tests/calculator.test.mjs tests/bills.test.mjs",
+    "test:e2e": "node --test tests/courtledger_e2e.test.mjs",
     "worker:dev": "cd worker && npx wrangler dev",
     "worker:deploy": "cd worker && npx wrangler deploy",
     "d1:migrate": "cd worker && npx wrangler d1 execute host-calculator-db --remote --file=../migrations/0001_create_venues.sql",

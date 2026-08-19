@@ -1,5 +1,5 @@
 /**
- * HostCalculator - Auth & User Manager Module
+ * OmniBox - Auth & User Manager Module
  * Handles Login, Registration, Token management, Session validation, and Admin Role checks.
  */
 
@@ -23,14 +23,16 @@
     }, duration);
   };
 
-  const TOKEN_KEY = 'hostcalculator_auth_token';
-  const USER_KEY = 'hostcalculator_user_info';
+  const TOKEN_KEY = 'omnibox_auth_token';
+  const USER_KEY = 'omnibox_user_info';
+  const LEGACY_TOKEN_KEY = 'hostcalculator_auth_token';
+  const LEGACY_USER_KEY = 'hostcalculator_user_info';
 
-  let currentToken = localStorage.getItem(TOKEN_KEY) || null;
+  let currentToken = localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY) || null;
   let currentUser = null;
 
   try {
-    const rawUser = localStorage.getItem(USER_KEY);
+    const rawUser = localStorage.getItem(USER_KEY) || localStorage.getItem(LEGACY_USER_KEY);
     if (rawUser) currentUser = JSON.parse(rawUser);
   } catch (e) {
     currentUser = null;

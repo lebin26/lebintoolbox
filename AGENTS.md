@@ -1,6 +1,6 @@
 # AI Agent Development & Vibe Coding Guidelines (`AGENTS.md`)
 
-This file governs all AI Agents (including Gemini, ChatGPT, Claude, Cursor, Antigravity) operating on the `HostCalculator` project.
+This file governs all AI Agents (including Gemini, ChatGPT, Claude, Cursor, Antigravity) operating on the `OmniBox` project (featuring the `Court Ledger` application).
 
 ---
 
@@ -27,10 +27,11 @@ This file governs all AI Agents (including Gemini, ChatGPT, Claude, Cursor, Anti
 
 ### 1. Before Modifying Code
 1. Read [`docs/ARCHITECTURE.md`](file:///Users/lebin/Documents/GitHub/HostCalculator/docs/ARCHITECTURE.md) to understand overall system architecture.
-2. Read [`docs/API.md`](file:///Users/lebin/Documents/GitHub/HostCalculator/docs/API.md) if touch points involve backend endpoints.
-3. Read [`docs/DATABASE.md`](file:///Users/lebin/Documents/GitHub/HostCalculator/docs/DATABASE.md) if touch points involve data structures.
-4. Run `git status` / inspect working directory before making changes.
-5. Search for existing utility functions and existing patterns in `frontend/js/` and `worker/src/`.
+2. Read [`docs/PROJECT_TREE.md`](file:///Users/lebin/Documents/GitHub/HostCalculator/docs/PROJECT_TREE.md) to understand multi-app directory organization and expansion rules.
+3. Read [`docs/API.md`](file:///Users/lebin/Documents/GitHub/HostCalculator/docs/API.md) if touch points involve backend endpoints.
+4. Read [`docs/DATABASE.md`](file:///Users/lebin/Documents/GitHub/HostCalculator/docs/DATABASE.md) if touch points involve data structures.
+5. Run `git status` / inspect working directory before making changes.
+6. Search for existing utility functions and existing patterns in `frontend/js/` and `worker/src/`.
 
 ### 2. Before Modifying Database / Schema
 1. Check `migrations/` directory for existing migration files.

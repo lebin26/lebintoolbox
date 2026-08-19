@@ -80,7 +80,7 @@ function validateUsername(name) {
   }
 
   // 6. Blacklisted / Reserved System Words
-  const reservedWords = ['root', 'system', 'support', 'null', 'undefined', 'anonymous', 'hostcalculator', 'official'];
+  const reservedWords = ['root', 'system', 'support', 'null', 'undefined', 'anonymous', 'hostcalculator', 'omnibox', 'official'];
   if (reservedWords.includes(raw.toLowerCase())) {
     return { valid: false, error: '该用户名为系统保留名称，请换一个用户名' };
   }

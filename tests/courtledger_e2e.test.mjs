@@ -3,14 +3,24 @@ import assert from 'node:assert/strict';
 
 const WORKER_URL = 'http://127.0.0.1:8787';
 
-test('Worker API - Health check', async () => {
+let workerAvailable = false;
+try {
+  const check = await fetch(`${WORKER_URL}/health`, { signal: AbortSignal.timeout(500) });
+  if (check.ok) workerAvailable = true;
+} catch {
+  workerAvailable = false;
+}
+
+const skipReason = workerAvailable ? false : 'Local Cloudflare Worker is offline (start via "npm run dev:worker" to test live API)';
+
+test('Worker API - Health check', { skip: skipReason }, async () => {
   const res = await fetch(`${WORKER_URL}/health`);
   assert.equal(res.status, 200);
   const data = await res.json();
   assert.equal(data.status, 'ok');
 });
 
-test('Worker API - Venues CRUD', async () => {
+test('Worker API - Venues CRUD', { skip: skipReason }, async () => {
   // 1. Get Venues
   const getRes = await fetch(`${WORKER_URL}/api/venues`);
   assert.equal(getRes.status, 200);
@@ -54,7 +64,7 @@ test('Worker API - Venues CRUD', async () => {
   assert.equal(delRes.status, 200);
 });
 
-test('Worker API - Multi-Tenant Account-Isolated Bills CRUD', async () => {
+test('Worker API - Multi-Tenant Account-Isolated Bills CRUD', { skip: skipReason }, async () => {
   const shortA = String(Date.now()).slice(-5) + 'a';
   const shortB = String(Date.now()).slice(-5) + 'b';
 
@@ -184,7 +194,7 @@ test('Worker API - Multi-Tenant Account-Isolated Bills CRUD', async () => {
   assert.equal(delBRes.status, 200);
 });
 
-test('Worker API - User Profile & Admin Edit User', async () => {
+test('Worker API - User Profile & Admin Edit User', { skip: skipReason }, async () => {
   const shortId = String(Date.now()).slice(-6);
   const testEmail = `user${shortId}@example.com`;
   const initialName = `user_${shortId}`;

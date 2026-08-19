@@ -1,7 +1,11 @@
-# Project Architecture Documentation (`docs/ARCHITECTURE.md`)
+# OmniBox Architecture Documentation (`docs/ARCHITECTURE.md`)
 
-## 1. Project Overview
-**HostCalculator (羽毛球 AA 算账与实用工具箱)** is a web application designed for badminton activity hosts to calculate venue court fees, shuttlecock costs, and individual AA expense shares.
+## 1. Project Overview & Positioning
+**OmniBox** is a modular, multi-app productivity platform designed to host various utility applications with a unified authentication, theme, and full-screen window management system.
+
+- **Platform Container**: **OmniBox**
+- **Flagship Application**: **Court Ledger** (🏸 Badminton Activity AA Bill & Venue Cost Calculator)
+- **Project Structure & App Expansion Guide**: See [`docs/PROJECT_TREE.md`](PROJECT_TREE.md).
 
 ---
 
@@ -11,8 +15,8 @@
 | :--- | :--- | :--- |
 | **Frontend** | Vanilla HTML5, Vanilla CSS, ES6 JS (Modules), Vite | User Interface, local dev server with HMR, client-side calculation & state management |
 | **API Layer** | Cloudflare Worker | Serverless API routing, CORS handling, data validation |
-| **Database** | Cloudflare D1 (SQLite Engine) | Serverless relational DB storing venue names and morning/evening rates |
-| **Hosting (FE)** | GitHub Pages | Static web hosting for frontend application |
+| **Database** | Cloudflare D1 (SQLite Engine) | Serverless relational DB storing users, audit logs, and app-specific data (venues, bills) |
+| **Hosting (FE)** | GitHub Pages / Cloudflare Pages | Static web hosting for frontend application |
 | **Hosting (API)** | Cloudflare Workers Edge Network | Global low-latency API execution |
 | **Build & Deploy** | Cloudflare Workers Builds + GitHub Pages CI | Automated GitHub `push` deployment |
 
@@ -26,7 +30,7 @@
 | (GitHub Pages / Vite) |
 +-----------+-----------+
             |
-     HTTP Fetch Request (/api/venues)
+     HTTP Fetch Request (/api/...)
             |
             v
 +-----------------------+
@@ -50,16 +54,16 @@
 
 ### Production Deployment Flow:
 - Frontend hosted at GitHub Pages (or custom domain).
-- Frontend queries Cloudflare Worker API at `https://hostcalculator-worker.<subdomain>.workers.dev/api/venues`.
+- Frontend queries Cloudflare Worker API at `https://omnibox-worker.<subdomain>.workers.dev/api/...`.
 - Worker executes queries on Cloudflare D1 Remote Database (`host-calculator-db`).
 
 ---
 
 ## 4. Authentication & Authorization (Unified User & Admin RBAC)
 
-- **Single Account Architecture**: All users use one unified account system (`users` table).
+- **Single Account Architecture**: All users across all OmniBox apps share one unified account system (`users` table).
 - **Role Control**:
-  - `role = 'user'`: Accesses normal app features (Hub, CourtLedger, HistoryBills).
+  - `role = 'user'`: Accesses normal apps (Hub, CourtLedger, HistoryBills).
   - `role = 'admin'`: Accesses 100% of normal user features **plus** `/admin` Admin Dashboard (`#view-admin`).
 - **Backend Enforcement**: Cloudflare Worker performs strict token authentication (`/api/auth/*`) and server-side RBAC authorization (`requireAdmin` middleware) returning `403 Forbidden` for unauthorized requests to `/api/admin/*`.
 - **Audit Logs**: All admin actions (role changes, user suspensions, activations) are logged to `admin_logs`.
@@ -72,7 +76,7 @@
 | Environment | Frontend URL | Worker API | Database |
 | :--- | :--- | :--- | :--- |
 | **Local (Dev)** | `http://localhost:8000` | `http://127.0.0.1:8787` | Local SQLite in `.wrangler/state/v3/d1/` |
-| **Production** | GitHub Pages URL | Cloudflare Workers Edge | Cloudflare D1 (`f4d383d8-ffa7-463e-87b0-088a3dbc7f79`) |
+| **Production** | GitHub Pages URL | Cloudflare Workers Edge | Cloudflare D1 (`host-calculator-db`) |
 
 > **Critical Rule**: AI Agents & Developers MUST default to working in the `Local` environment. Direct schema modifications or manual deletions on `Production` database are strictly prohibited.
 
@@ -102,7 +106,7 @@ Cloudflare Workers Production Edge
 ## 7. Critical Constraints & Preservation Directives
 
 1. **Do NOT delete or rewrite existing UI features** (`courtledger.html`, `hub.html`, court fee calculations, shuttlecock share calculations, QR code renderer, bill exporter).
-2. **Do NOT alter executed migration files** in `migrations/`. Always append new migrations sequentially (e.g., `0002_xxx.sql`).
+2. **Do NOT alter executed migration files** in `migrations/`. Always append new migrations sequentially (e.g., `0008_xxx.sql`).
 3. **Do NOT expose secrets or credentials** in Git commits (`.env`, Cloudflare tokens, admin keys).
 4. **Preserve CORS preflight handling** in `worker/src/index.js`.
 5. **Full-Screen Sub-Window Standard**: Every feature screen or sub-window entered via button clicks (such as History Bills, Database Dashboards, or Complex Tools) MUST be designed as a full-screen standalone page/view (`.modal-fullscreen`). Do not manufacture tiny or narrow pop-up dialog boxes. Ensure touch scroll isolation (`body.modal-open`) and prevent background page swipe leaks.

@@ -1,5 +1,5 @@
 /**
- * Cloudflare Worker API for HostCalculator
+ * Cloudflare Worker API for OmniBox (Platform Core & Court Ledger)
  * Includes Authentication, Unified User & Admin RBAC System, Cloudflare D1 integration, and Audit Logs.
  */
 
@@ -135,7 +135,7 @@ export default {
       if (method === 'GET' && (path === '/health' || (path === '/' && !env.ASSETS) || path === '/api')) {
         return jsonResponse({
           status: 'ok',
-          service: 'HostCalculator API Worker',
+          service: 'OmniBox API Worker',
           version: '1.0.0',
           endpoints: [
             '/api/venues',
@@ -185,7 +185,7 @@ function validateUsername(name) {
   }
 
   // 6. Blacklisted / Reserved System Words
-  const reservedWords = ['root', 'system', 'support', 'null', 'undefined', 'anonymous', 'hostcalculator', 'official'];
+  const reservedWords = ['root', 'system', 'support', 'null', 'undefined', 'anonymous', 'hostcalculator', 'omnibox', 'official'];
   if (reservedWords.includes(raw.toLowerCase())) {
     return { valid: false, error: '该用户名为系统保留名称，请换一个用户名' };
   }

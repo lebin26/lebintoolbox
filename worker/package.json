@@ -1,7 +1,7 @@
 {
-  "name": "hostcalculator-worker",
+  "name": "omnibox-worker",
   "version": "1.0.0",
-  "description": "HostCalculator Cloudflare Worker API connected to D1 Database",
+  "description": "OmniBox Cloudflare Worker Serverless API (Court Ledger & Platform Services)",
   "main": "src/index.js",
   "type": "module",
   "scripts": {

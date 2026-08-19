@@ -1,5 +1,5 @@
 /**
- * Court Ledger - Master Application Entry Point
+ * OmniBox - Master Application Entry Point
  * Bootstraps authentication, router, theme, drawer, domain state, calculator UI, swipe gesture, admin dashboard, bill copier, and QR overlay.
  */
 
@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.CourtLedgerQR.initQRSystem();
   }
 
-  console.log('HostCalculator application initialized successfully!');
+  console.log('OmniBox application initialized successfully! (Active App: Court Ledger)');
 });
 
 function bindAuthPageControls() {

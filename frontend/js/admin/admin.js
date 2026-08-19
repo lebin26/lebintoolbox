@@ -1,5 +1,5 @@
 /**
- * HostCalculator - Admin Management Module
+ * OmniBox - Admin Management Module
  * Connects to Cloudflare Worker /api/admin/* endpoints for Overview, Users Management, and Audit Trail.
  */
 
@@ -31,6 +31,35 @@
         loadActiveTabData();
       });
     });
+
+    // Sidebar Collapse / Expand Toggle
+    const sidebarToggleBtn = document.getElementById('admin-sidebar-toggle-btn');
+    const adminSidebar = document.getElementById('admin-sidebar');
+    const adminLayoutWrapper = document.querySelector('.admin-layout-wrapper');
+
+    function toggleSidebar() {
+      if (!adminSidebar) return;
+      const willCollapse = !adminSidebar.classList.contains('collapsed');
+      adminSidebar.classList.toggle('collapsed', willCollapse);
+      if (adminLayoutWrapper) adminLayoutWrapper.classList.toggle('sidebar-collapsed', willCollapse);
+      localStorage.setItem('omnibox_admin_sidebar_collapsed', willCollapse ? 'true' : 'false');
+    }
+
+    if (adminSidebar) {
+      // Restore persisted state
+      const isCollapsed = localStorage.getItem('omnibox_admin_sidebar_collapsed') === 'true';
+      if (isCollapsed) {
+        adminSidebar.classList.add('collapsed');
+        if (adminLayoutWrapper) adminLayoutWrapper.classList.add('sidebar-collapsed');
+      }
+
+      if (sidebarToggleBtn) {
+        sidebarToggleBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleSidebar();
+        });
+      }
+    }
 
     // User Search & Filter bindings
     const searchInput = document.getElementById('admin-user-search');

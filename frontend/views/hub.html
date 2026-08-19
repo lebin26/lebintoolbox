@@ -5,17 +5,22 @@
   <!-- Raycast / Linear Style Hub Grid -->
   <section class="shortcuts-grid" id="tool-grid">
 
-    <!-- Shortcut Card 0: Admin Console (Visible ONLY for Admin) -->
-    <div id="hub-admin-card" class="shortcut-card shortcut-purple hidden" data-target-view="admin">
+    <!-- Shortcut Card 0: Admin Console (Exclusive VIP Master Card, visible ONLY for Admin) -->
+    <div id="hub-admin-card" class="shortcut-card shortcut-admin-exclusive hidden" data-target-view="admin">
       <div class="shortcut-top">
-        <div class="shortcut-icon-circle">
+        <div class="shortcut-icon-circle admin-icon-glow">
           <span class="shortcut-icon">👑</span>
         </div>
-        <span class="shortcut-pill-badge">ADMIN</span>
+        <div class="admin-badge-group">
+          <span class="shortcut-pill-badge badge-master">⚡ SUPER ADMIN</span>
+        </div>
       </div>
       <div class="shortcut-bottom">
-        <h2 class="shortcut-title">Admin Console</h2>
-        <span class="shortcut-subtitle">系统控制台与用户权限管理</span>
+        <div class="admin-title-row">
+          <h2 class="shortcut-title admin-title-gradient">Admin Console</h2>
+          <span class="admin-tag-pro">MASTER</span>
+        </div>
+        <span class="shortcut-subtitle">全系统唯一控制中心 · 权限治理与安全审计</span>
       </div>
     </div>
 
