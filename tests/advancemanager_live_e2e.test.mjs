@@ -163,4 +163,15 @@ test('Live E2E: Full Lifecycle Test for Advance Manager', async () => {
   const expB = await req('/api/advancemanager/expenses', { method: 'GET' }, tokenB);
   assert.equal(expB.status, 200);
   assert.equal(expB.data.data.expenses.length, 0, 'User B must not see User A expenses');
+
+  // 12. Clean up test users so no dummy records remain in DB
+  const adminToken = Buffer.from(JSON.stringify({ userId: 1, role: 'admin', ts: Date.now() })).toString('base64');
+  if (regRes.data?.user?.id) {
+    const delA = await req(`/api/admin/users/${regRes.data.user.id}`, { method: 'DELETE' }, adminToken);
+    assert.equal(delA.status, 200, `Delete User A failed: ${JSON.stringify(delA.data)}`);
+  }
+  if (regB.data?.user?.id) {
+    const delB = await req(`/api/admin/users/${regB.data.user.id}`, { method: 'DELETE' }, adminToken);
+    assert.equal(delB.status, 200, `Delete User B failed: ${JSON.stringify(delB.data)}`);
+  }
 });

@@ -179,12 +179,33 @@ async function autoPruneResolvedHistory(env, userId) {
     }
   }
 
+  // 3. Purge legacy temporary badminton expenses from am_expenses table
+  const tempBadmintonExpenses = await env.DB.prepare(
+    `SELECT id FROM am_expenses WHERE owner_user_id = ? AND (description LIKE '%🏸%' OR description LIKE '%羽%' OR description LIKE '%Court%')`
+  ).bind(userId).all();
+  for (const e of (tempBadmintonExpenses.results || [])) {
+    await env.DB.prepare('DELETE FROM am_expense_participants WHERE expense_id = ?').bind(e.id).run();
+    await env.DB.prepare('DELETE FROM am_expenses WHERE id = ?').bind(e.id).run();
+    prunedCount++;
+  }
+
+  // 4. Purge all temporary persons created during legacy testing
+  await env.DB.prepare(
+    `DELETE FROM am_persons WHERE owner_user_id = ? AND is_temporary = 1`
+  ).bind(userId).run();
+
   return prunedCount;
 }
 
 export async function handleAdvanceManagerRequest(request, env, currentUser, path, method) {
   if (!currentUser) {
     return failureResponse('AUTH_REQUIRED', '请先登录以使用垫付管理', 401);
+  }
+
+  // Sub-App Access Permission Check
+  const allowed = currentUser.allowedApps || (Array.isArray(currentUser.allowed_apps) ? currentUser.allowed_apps : ['courtledger', 'advancemanager']);
+  if (currentUser.role !== 'admin' && !allowed.includes('advancemanager')) {
+    return failureResponse('FORBIDDEN', '权限受限：您当前暂未获得【Advance Manager】的访问授权，请联系系统管理员开通！', 403);
   }
 
   const userId = String(currentUser.id);
@@ -195,13 +216,16 @@ export async function handleAdvanceManagerRequest(request, env, currentUser, pat
   // -------------------------------------------------------------------
   if (method === 'GET' && path === '/api/advancemanager/dashboard') {
     const personsRes = await env.DB.prepare(
-      'SELECT id, name, nickname, avatar_url FROM am_persons WHERE owner_user_id = ? AND is_archived = 0'
+      `SELECT id, name, nickname, avatar_url, is_favourite, is_temporary 
+       FROM am_persons 
+       WHERE owner_user_id = ? AND is_archived = 0 AND (is_temporary = 0 OR is_temporary IS NULL)`
     ).bind(userId).all();
     const persons = personsRes.results || [];
 
     const expensesRes = await env.DB.prepare(
       `SELECT e.id, e.payer_person_id, e.total_amount, e.status, e.description, e.transaction_date
-       FROM am_expenses e WHERE e.owner_user_id = ? AND e.status != 'cancelled'
+       FROM am_expenses e 
+       WHERE e.owner_user_id = ? AND e.status != 'cancelled' AND (e.description NOT LIKE '%🏸%' AND e.description NOT LIKE '%羽%')
        ORDER BY e.transaction_date DESC`
     ).bind(userId).all();
     const rawExpenses = expensesRes.results || [];
@@ -263,6 +287,20 @@ export async function handleAdvanceManagerRequest(request, env, currentUser, pat
     peopleWhoOwe.sort((a, b) => b.amount - a.amount);
     peopleIOwe.sort((a, b) => b.amount - a.amount);
 
+    const personsWithBalances = persons.map(p => {
+      const isSelf = p.id === selfPerson.id;
+      const pw = meBalance.pairwise[p.id] || { net: 0, theyOweMe: 0, iOweThem: 0 };
+      return {
+        ...p,
+        isSelf,
+        is_temporary: Boolean(p.is_temporary),
+        is_favourite: Boolean(p.is_favourite),
+        netBalance: isSelf ? (personBalances[p.id]?.netBalance || 0) : pw.net,
+        theyOweMe: isSelf ? 0 : pw.theyOweMe,
+        iOweThem: isSelf ? 0 : pw.iOweThem
+      };
+    });
+
     // Total Advanced (expenses where self was payer)
     const totalAdvanced = expenses
       .filter(e => e.payer_person_id === selfPerson.id)
@@ -282,6 +320,7 @@ export async function handleAdvanceManagerRequest(request, env, currentUser, pat
       netBalance: meBalance.netBalance,   // Overall net
       peopleWhoOwe,
       peopleIOwe,
+      persons: personsWithBalances,
       recentExpenses: rawExpenses.slice(0, 5),
       recentSettlements: settlements
     });
@@ -292,14 +331,17 @@ export async function handleAdvanceManagerRequest(request, env, currentUser, pat
   // -------------------------------------------------------------------
   if (method === 'GET' && path === '/api/advancemanager/persons') {
     const personsRes = await env.DB.prepare(
-      'SELECT * FROM am_persons WHERE owner_user_id = ? ORDER BY is_favourite DESC, is_archived ASC, name ASC'
+      `SELECT * FROM am_persons 
+       WHERE owner_user_id = ? AND (is_temporary = 0 OR is_temporary IS NULL)
+       ORDER BY is_favourite DESC, is_archived ASC, name ASC`
     ).bind(userId).all();
     const persons = personsRes.results || [];
 
     // Calculate balances for each person
     const expensesRes = await env.DB.prepare(
       `SELECT e.id, e.payer_person_id, e.total_amount, e.status
-       FROM am_expenses e WHERE e.owner_user_id = ? AND e.status != 'cancelled'`
+       FROM am_expenses e 
+       WHERE e.owner_user_id = ? AND e.status != 'cancelled' AND (e.description NOT LIKE '%🏸%' AND e.description NOT LIKE '%羽%')`
     ).bind(userId).all();
     const rawExpenses = expensesRes.results || [];
 
@@ -343,6 +385,10 @@ export async function handleAdvanceManagerRequest(request, env, currentUser, pat
 
   // POST /api/advancemanager/persons - Create Person
   if (method === 'POST' && path === '/api/advancemanager/persons') {
+    if (currentUser.role !== 'admin' && (!Array.isArray(currentUser.appPermissions) || !currentUser.appPermissions.includes('advancemanager:manage_people'))) {
+      return failureResponse('FORBIDDEN', '⛔ 权限不足：您当前暂无【管理涉及人物】的权限，请联系 Admin 开通！', 403);
+    }
+
     const body = await request.json().catch(() => null);
     if (!body || !body.name || !body.name.trim()) {
       return failureResponse('VALIDATION_ERROR', '人物姓名不能为空');
@@ -350,7 +396,7 @@ export async function handleAdvanceManagerRequest(request, env, currentUser, pat
 
     const id = 'p_' + generateUUID().slice(0, 12);
     const now = new Date().toISOString();
-    const isTemp = body.is_temporary ? 1 : 0;
+    const isTemp = (body.is_temporary || body.person_type === 'temporary') ? 1 : 0;
     const isFav = (!isTemp && body.is_favourite) ? 1 : 0;
 
     await env.DB.prepare(
@@ -558,6 +604,10 @@ export async function handleAdvanceManagerRequest(request, env, currentUser, pat
 
   // POST /api/advancemanager/expenses - Create Expense with Participants
   if (method === 'POST' && path === '/api/advancemanager/expenses') {
+    if (currentUser.role !== 'admin' && (!Array.isArray(currentUser.appPermissions) || !currentUser.appPermissions.includes('advancemanager:create_expense'))) {
+      return failureResponse('FORBIDDEN', '⛔ 权限不足：您当前暂无【新增垫付】的权限，请联系 Admin 开通！', 403);
+    }
+
     const body = await request.json().catch(() => null);
     if (!body) return failureResponse('VALIDATION_ERROR', '无效请求体');
 
@@ -690,6 +740,10 @@ export async function handleAdvanceManagerRequest(request, env, currentUser, pat
 
   // DELETE /api/advancemanager/expenses/:id - Soft Delete (Cancel)
   if (method === 'DELETE' && expenseIdMatch) {
+    if (currentUser.role !== 'admin' && (!Array.isArray(currentUser.appPermissions) || !currentUser.appPermissions.includes('advancemanager:delete_expense'))) {
+      return failureResponse('FORBIDDEN', '⛔ 权限不足：您当前暂无【删除/取消垫付记录】的权限，请联系 Admin 开通！', 403);
+    }
+
     const expId = expenseIdMatch[1];
     const existing = await env.DB.prepare(
       'SELECT id, status, total_amount, description FROM am_expenses WHERE id = ? AND owner_user_id = ?'
@@ -736,6 +790,10 @@ export async function handleAdvanceManagerRequest(request, env, currentUser, pat
   }
 
   if (method === 'POST' && path === '/api/advancemanager/settlements') {
+    if (currentUser.role !== 'admin' && (!Array.isArray(currentUser.appPermissions) || !currentUser.appPermissions.includes('advancemanager:settle'))) {
+      return failureResponse('FORBIDDEN', '⛔ 权限不足：您当前暂无【平账与结算】的权限，请联系 Admin 开通！', 403);
+    }
+
     const body = await request.json().catch(() => null);
     if (!body) return failureResponse('VALIDATION_ERROR', '无效请求体');
 
@@ -905,6 +963,31 @@ export async function handleAdvanceManagerRequest(request, env, currentUser, pat
       totalProjectCost,
       expenses
     });
+  }
+
+  // PUT /api/advancemanager/projects/:id - Update Project Status / Name
+  if (method === 'PUT' && projectIdMatch) {
+    const projId = projectIdMatch[1];
+    const body = await request.json().catch(() => null);
+    if (!body) return failureResponse('VALIDATION_ERROR', '无效请求体');
+
+    const fields = [];
+    const values = [];
+    if (body.name !== undefined) { fields.push('name = ?'); values.push(body.name.trim()); }
+    if (body.description !== undefined) { fields.push('description = ?'); values.push(body.description ? body.description.trim() : null); }
+    if (body.status !== undefined) { fields.push('status = ?'); values.push(body.status.toLowerCase()); }
+
+    if (fields.length === 0) return failureResponse('VALIDATION_ERROR', '无有效更新字段');
+
+    fields.push('updated_at = ?');
+    values.push(new Date().toISOString());
+    values.push(projId, userId);
+
+    await env.DB.prepare(
+      `UPDATE am_projects SET ${fields.join(', ')} WHERE id = ? AND owner_user_id = ?`
+    ).bind(...values).run();
+
+    return successResponse({ id: projId, message: '项目更新成功' });
   }
 
   return failureResponse('NOT_FOUND', '未找到 Advance Manager API 路由', 404);

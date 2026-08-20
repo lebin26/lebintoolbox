@@ -36,6 +36,93 @@
   background: var(--surface-elevated);
 }
 
+/* ── Locked App Subcard State ── */
+.shortcut-card.is-locked {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  transition: all 0.25s ease;
+}
+
+.shortcut-card.is-locked .shortcut-top,
+.shortcut-card.is-locked .shortcut-bottom {
+  filter: grayscale(0.95) blur(0.5px);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.shortcut-card.is-locked .locked-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  z-index: 10;
+  border-radius: inherit;
+  transition: background 0.25s ease, backdrop-filter 0.25s ease;
+}
+
+.shortcut-card.is-locked:hover .locked-overlay {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.shortcut-card.is-locked .locked-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(30, 41, 59, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  font-size: 1.25rem;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.shortcut-card.is-locked:hover .locked-icon-badge {
+  transform: scale(1.12);
+}
+
+.shortcut-card.is-locked .locked-text {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #f8fafc;
+  letter-spacing: 0.3px;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 3px 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+html[data-theme="light"] .shortcut-card.is-locked .locked-overlay {
+  background: rgba(241, 245, 249, 0.75);
+}
+
+html[data-theme="light"] .shortcut-card.is-locked:hover .locked-overlay {
+  background: rgba(241, 245, 249, 0.88);
+}
+
+html[data-theme="light"] .shortcut-card.is-locked .locked-icon-badge {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+html[data-theme="light"] .shortcut-card.is-locked .locked-text {
+  color: #334155;
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
 .shortcut-purple {
   color: var(--text-primary);
 }

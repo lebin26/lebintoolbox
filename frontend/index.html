@@ -213,12 +213,12 @@
           </div>
 
           <!-- Court Ledger Card -->
-          <div class="shortcut-card shortcut-purple" data-target-view="courtledger">
+          <div class="shortcut-card shortcut-purple" id="hub-card-courtledger" data-target-view="courtledger">
             <div class="shortcut-top">
               <div class="shortcut-icon-circle">
                 <span class="shortcut-icon">🏸</span>
               </div>
-              <span class="shortcut-pill-badge">ACTIVE</span>
+              <span class="shortcut-pill-badge" id="hub-badge-courtledger">ACTIVE</span>
             </div>
             <div class="shortcut-bottom">
               <h2 class="shortcut-title">Court Ledger</h2>
@@ -227,12 +227,12 @@
           </div>
 
           <!-- Advance Manager Card -->
-          <div class="shortcut-card shortcut-emerald" data-target-view="advancemanager">
+          <div class="shortcut-card shortcut-emerald" id="hub-card-advancemanager" data-target-view="advancemanager">
             <div class="shortcut-top">
               <div class="shortcut-icon-circle" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">
                 <span class="shortcut-icon">💸</span>
               </div>
-              <span class="shortcut-pill-badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.3);">ACTIVE</span>
+              <span class="shortcut-pill-badge" id="hub-badge-advancemanager" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.3);">ACTIVE</span>
             </div>
             <div class="shortcut-bottom">
               <h2 class="shortcut-title">Advance Manager</h2>
@@ -261,6 +261,26 @@
 
               <!-- Slide 1: Calculator page -->
               <div class="swipe-slide" id="slide-calc">
+
+                <!-- 🏸 3-Step Operation Flow Sequence Bar -->
+                <div class="cl-flow-bar">
+                  <div class="flow-step-item active">
+                    <span class="step-num">1</span>
+                    <span class="step-title">参数测算</span>
+                  </div>
+                  <span class="flow-divider">➔</span>
+                  <div class="flow-step-item" id="flow-step-roster" onclick="CourtLedgerRoster.openRosterModal()" style="cursor:pointer;" title="点击录入/解析接龙名单">
+                    <span class="step-num">2</span>
+                    <span class="step-title">涉及人员</span>
+                    <span id="flow-roster-badge" class="flow-step-badge">未导入</span>
+                  </div>
+                  <span class="flow-divider">➔</span>
+                  <div class="flow-step-item" id="flow-step-generate" onclick="CourtLedgerRoster.generateAndExportBill()" style="cursor:pointer;" title="点击流转至垫付管家独立核销">
+                    <span class="step-num">3</span>
+                    <span class="step-title">生成独立账单</span>
+                  </div>
+                </div>
+
                 <section class="inputs-section">
 
                   <!-- 场地选择 & 场地费计算参数 -->
@@ -268,7 +288,11 @@
                     <div class="input-group venue-group">
                       <div class="label-row-between">
                         <label for="venue-select">选择场地</label>
-                        <span id="venue-rate-badge" class="venue-rate-badge">加载中...</span>
+                        <div class="venue-header-actions">
+                          <span id="venue-rate-badge" class="venue-rate-badge">加载中...</span>
+                          <button type="button" id="btn-open-roster-modal" class="btn-roster-quick-btn" title="导入微信/WhatsApp接龙名单并跟踪收款">📋 接龙名单与收款</button>
+                          <button type="button" id="btn-manage-venues" class="btn-icon-link" title="数据库球场管理">⚙️ 管理球场</button>
+                        </div>
                       </div>
                       <div class="input-wrapper select-wrapper">
                         <select id="venue-select">
@@ -495,20 +519,25 @@
                     </div>
                   </div>
 
-                  <!-- Bill Action Buttons (Copy, Save, History) -->
-                  <div class="bill-actions-row">
-                    <button id="copy-bill-btn" class="copy-bill-btn">
-                      <span class="btn-icon">📋</span>
-                      <span class="btn-text">复制账单</span>
+                  <!-- Streamlined Workflow Actions (Pure Calculator -> Standalone Bill Ledger) -->
+                  <div class="cl-workflow-actions">
+                    <button type="button" id="btn-generate-standalone-bill" class="btn-generate-bill-cta" onclick="CourtLedgerRoster.generateAndExportBill()">
+                      <span class="btn-icon">🚀</span>
+                      <div class="btn-text-group">
+                        <span class="btn-main-text">生成独立账单并流转</span>
+                        <span class="btn-sub-text">流转至垫付管家 · 复制微信/WhatsApp文案</span>
+                      </div>
                     </button>
-                    <button id="save-bill-btn" class="save-bill-btn">
-                      <span class="btn-icon">💾</span>
-                      <span class="btn-text">保存账单</span>
-                    </button>
-                    <button id="history-bill-btn" class="history-bill-btn">
-                      <span class="btn-icon">📜</span>
-                      <span class="btn-text">历史账单</span>
-                    </button>
+                    <div class="cl-sub-actions-row">
+                      <button type="button" id="btn-open-roster-action" class="btn-sub-action" onclick="CourtLedgerRoster.openRosterModal()">
+                        <span class="btn-icon">👥</span>
+                        <span class="btn-text" id="btn-roster-action-text">接龙与涉及人员</span>
+                      </button>
+                      <button type="button" id="copy-bill-btn" class="btn-sub-action copy-bill-btn">
+                        <span class="btn-icon">📋</span>
+                        <span class="btn-text">复制分享文案</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -675,6 +704,10 @@
                 <span class="tab-icon">👥</span>
                 <span class="tab-label">用户信息管理</span>
               </button>
+              <button type="button" class="admin-tab-btn" data-tab="app-access" title="应用授权与统计">
+                <span class="tab-icon">📊</span>
+                <span class="tab-label">应用授权与统计</span>
+              </button>
               <button type="button" class="admin-tab-btn" data-tab="app-courtledger" title="Court Ledger 后台">
                 <span class="tab-icon">🏸</span>
                 <span class="tab-label">Court Ledger 后台</span>
@@ -719,23 +752,30 @@
                 <span id="admin-stat-suspended-users" class="kpi-value tag-bearish">0 人</span>
               </div>
               <div class="kpi-card">
-                <span class="kpi-label">管理员人数</span>
+                <span class="kpi-label">管理层人数</span>
                 <span id="admin-stat-admin-users" class="kpi-value tag-accent">0 人</span>
               </div>
             </div>
 
-            <div class="admin-toolbar">
-              <input type="text" id="admin-user-search" class="modal-input" placeholder="🔍 搜索用户名字或邮箱...">
-              <select id="admin-role-filter" class="modal-select date-filter-select">
-                <option value="all">所有角色 Role</option>
-                <option value="user">Standard User</option>
-                <option value="admin">Administrator</option>
-              </select>
-              <select id="admin-status-filter" class="modal-select date-filter-select">
-                <option value="all">所有状态 Status</option>
-                <option value="active">🟢 正常 (Active)</option>
-                <option value="suspended">🔴 已冻结 (Suspended)</option>
-              </select>
+            <div class="admin-toolbar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1;">
+                <input type="text" id="admin-user-search" class="modal-input" placeholder="🔍 搜索用户名字或邮箱..." style="min-width:200px;">
+                <select id="admin-role-filter" class="modal-select date-filter-select">
+                  <option value="all">所有角色 (All)</option>
+                  <option value="admin">👑 超级管理员 (Admin)</option>
+                  <option value="manager">🛡️ 二级管理员 (Manager)</option>
+                  <option value="user">👤 普通用户 (User)</option>
+                </select>
+                <select id="admin-status-filter" class="modal-select date-filter-select">
+                  <option value="all">所有状态 (Status)</option>
+                  <option value="active">🟢 正常 (Active)</option>
+                  <option value="suspended">🔴 已冻结 (Suspended)</option>
+                </select>
+              </div>
+              <button type="button" id="btn-open-create-user-modal" class="btn-primary-action" style="padding:6px 14px; white-space:nowrap; display:flex; align-items:center; gap:6px;">
+                <span>➕</span>
+                <span>创建新用户</span>
+              </button>
             </div>
 
             <div class="admin-table-wrapper">
@@ -747,6 +787,7 @@
                     <th>邮箱</th>
                     <th>设置密码 (Password)</th>
                     <th>角色权限 (Role)</th>
+                    <th>授权应用 (Apps)</th>
                     <th>状态 (Status)</th>
                     <th>注册时间</th>
                     <th>最近登录</th>
@@ -757,6 +798,34 @@
                   <!-- Dynamic user list -->
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          <!-- Tab 2: Sub-App Access & Coverage Analytics (应用授权与访问统计) -->
+          <div id="admin-tab-app-access" class="admin-tab-panel hidden">
+            <!-- App Access Summary KPI Grid -->
+            <div class="kpi-grid admin-kpi-grid" style="margin-bottom: var(--space-4);">
+              <div class="kpi-card">
+                <span class="kpi-label">全站用户总数</span>
+                <span id="admin-stat-access-total-users" class="kpi-value">0 人</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-label">活跃用户总数</span>
+                <span id="admin-stat-access-active-users" class="kpi-value tag-bullish">0 人</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-label">全功能畅享用户</span>
+                <span id="admin-stat-access-full-users" class="kpi-value tag-accent">0 人</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-label">受限访问用户</span>
+                <span id="admin-stat-access-restricted-users" class="kpi-value tag-bearish">0 人</span>
+              </div>
+            </div>
+
+            <!-- Dynamic Sub-Apps Cards Container -->
+            <div id="admin-app-access-cards-container" style="display:flex; flex-direction:column; gap: var(--space-4);">
+              <!-- Rendered dynamically by AdminModule -->
             </div>
           </div>
 
@@ -920,9 +989,9 @@
               <span class="tab-icon">👥</span>
               <span class="tab-label">涉及人物</span>
             </button>
-            <button type="button" class="am-tab-btn" data-tab="projects" onclick="AdvanceManagerUI.switchTab('projects')" title="活动项目">
+            <button type="button" class="am-tab-btn" data-tab="projects" onclick="AdvanceManagerUI.switchTab('projects')" title="活动与球局">
               <span class="tab-icon">🌴</span>
-              <span class="tab-label">活动项目</span>
+              <span class="tab-label">活动与球局</span>
             </button>
             <button type="button" class="am-tab-btn" data-tab="settlements" onclick="AdvanceManagerUI.switchTab('settlements')" title="还款结算">
               <span class="tab-icon">🤝</span>
@@ -944,16 +1013,12 @@
           <div class="admin-header-banner" style="margin-bottom: var(--space-4);">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; width:100%;">
               <div>
-                <h2 id="am-section-title" class="admin-page-title">📊 垫付总览看板</h2>
-                <span class="db-status-badge">⚡ 自动双向对冲 · 极速分摊平账系统</span>
+                <h2 id="am-section-title" style="margin:0; font-size:1.4rem; font-weight:800; color:var(--color-text-primary);">总览看板</h2>
+                <span style="font-size:0.82rem; color:var(--color-text-muted);">自动双向对冲 · 极速分摊平账系统</span>
               </div>
-              <div style="display:flex; gap:8px;">
-                <button type="button" class="am-btn-secondary" style="padding:8px 14px; font-size:0.88rem;" onclick="AdvanceManagerUI.openNewPersonModal()">
-                  <span>+ 添加人物</span>
-                </button>
-                <button type="button" class="am-btn-primary" style="padding:8px 16px; font-size:0.88rem;" onclick="AdvanceManagerUI.openNewExpenseModal()">
-                  <span>+ 记一笔垫付</span>
-                </button>
+              <div class="am-action-bar" style="display:flex; gap:8px;">
+                <button type="button" class="am-btn-secondary" onclick="AdvanceManagerUI.openNewPersonModal()">+ 添加人物</button>
+                <button type="button" class="am-btn-primary" onclick="AdvanceManagerUI.openNewExpenseModal()">+ 记一笔垫付</button>
               </div>
             </div>
           </div>
@@ -1034,15 +1099,15 @@
         <div id="am-tab-expenses" class="am-tab-content hidden">
           <div class="am-section-panel">
             <div class="am-panel-header">
-              <span class="am-panel-title">🧾 垫付记录清单</span>
-              <button type="button" class="am-btn-primary" style="padding:6px 12px; font-size:0.85rem;" onclick="AdvanceManagerUI.openNewExpenseModal()">+ 新增垫付</button>
+              <span class="am-panel-title">🧾 垫付支出流水明细</span>
+              <button type="button" class="am-btn-primary" style="padding:6px 12px; font-size:0.85rem;" onclick="AdvanceManagerUI.openNewExpenseModal()">+ 记一笔垫付</button>
             </div>
 
-            <!-- Real-time Filter & Search Toolbar -->
-            <div class="am-filter-bar">
-              <input type="text" class="am-search-input" placeholder="🔍 搜索垫付说明或人物..." oninput="AdvanceManagerUI.handleSearchInput(this.value)">
-              <select class="am-filter-select" onchange="AdvanceManagerUI.handleStatusFilter(this.value)">
-                <option value="">全部状态</option>
+            <!-- Filter Toolbar -->
+            <div class="am-filter-toolbar">
+              <input type="text" id="am-search-expenses" class="am-search-input" placeholder="🔍 搜索描述或金额..." oninput="AdvanceManagerUI.handleExpenseSearch(this.value)">
+              <select id="am-filter-status" class="am-filter-select" onchange="AdvanceManagerUI.handleStatusFilter(this.value)">
+                <option value="all">全部状态</option>
                 <option value="unsettled">未结清 (Unsettled)</option>
                 <option value="settled">已结清 (Settled)</option>
                 <option value="cancelled">已取消 (Cancelled)</option>
@@ -1061,8 +1126,10 @@
         <!-- TAB 3: PEOPLE LIST -->
         <div id="am-tab-people" class="am-tab-content hidden">
           <div class="am-section-panel">
-            <div class="am-panel-header">
-              <span class="am-panel-title">👥 涉及人物档案与往来账</span>
+            <div class="am-panel-header" style="flex-wrap: wrap; gap: 10px;">
+              <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <span class="am-panel-title">👥 涉及人物档案与往来账</span>
+              </div>
               <div style="display:flex; align-items:center; gap:8px;">
                 <select id="am-people-sort-select" class="am-filter-select" onchange="AdvanceManagerUI.handlePersonSortChange(this.value)">
                   <option value="name_asc">🔤 姓名升序 (A-Z)</option>
@@ -1079,20 +1146,31 @@
           </div>
         </div>
 
-        <!-- TAB 4: PROJECTS / TRIPS -->
+        <!-- TAB 4: PROJECTS / TRIPS / BADMINTON SESSIONS -->
         <div id="am-tab-projects" class="am-tab-content hidden">
           <div class="am-section-panel">
-            <div class="am-panel-header">
-              <span class="am-panel-title">🌴 活动与旅行归集项目</span>
-              <button type="button" class="am-btn-primary" style="padding:6px 12px; font-size:0.85rem;" onclick="AdvanceManagerUI.openNewProjectModal()">+ 创建新项目</button>
+            <div class="am-panel-header" style="flex-wrap: wrap; gap: 10px;">
+              <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <span class="am-panel-title">🌴 活动归集与球局项目</span>
+                <div class="am-filter-pill-group">
+                  <button type="button" class="am-filter-pill active" id="am-filter-proj-all" onclick="AdvanceManagerUI.filterProjectType('all')">🌐 全部未结清</button>
+                  <button type="button" class="am-filter-pill" id="am-filter-proj-badminton" onclick="AdvanceManagerUI.filterProjectType('badminton')">🏸 羽球球局</button>
+                  <button type="button" class="am-filter-pill" id="am-filter-proj-trips" onclick="AdvanceManagerUI.filterProjectType('trips')">🌴 旅行聚会</button>
+                  <button type="button" class="am-filter-pill" id="am-filter-proj-archived" onclick="AdvanceManagerUI.filterProjectType('archived')">📁 已结清归档</button>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <button type="button" class="am-btn-secondary" style="padding:6px 12px; font-size:0.85rem;" onclick="if(window.AppRouter){window.AppRouter.switchView('courtledger'); if(window.CourtLedgerRoster){window.CourtLedgerRoster.openRosterModal();}}" title="前往 Court Ledger 新建或导入接龙账单">🏸 新建羽球局 ➔</button>
+                <button type="button" class="am-btn-primary" style="padding:6px 12px; font-size:0.85rem;" onclick="AdvanceManagerUI.openNewProjectModal()">+ 创建新项目</button>
+              </div>
             </div>
             <div id="am-projects-list">
-              <!-- Dynamic -->
+              <!-- Dynamic Unified Projects & Badminton Sessions -->
             </div>
           </div>
         </div>
 
-        <!-- TAB 5: SETTLEMENTS LIST -->
+        <!-- TAB 6: SETTLEMENTS LIST -->
         <div id="am-tab-settlements" class="am-tab-content hidden">
           <div class="am-section-panel">
             <div class="am-panel-header">
@@ -1289,6 +1367,141 @@
     </div>
   </div>
 
+  <!-- Admin Create User Modal -->
+  <div id="admin-create-user-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">➕ 创建新用户</h3>
+        <button type="button" id="btn-close-admin-create-user-modal" class="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="admin-create-user-form" class="edit-user-form">
+          <div class="form-group">
+            <label for="admin-create-user-email">用户邮箱 (登录账号)</label>
+            <input type="email" id="admin-create-user-email" class="modal-input" required placeholder="user@example.com">
+          </div>
+
+          <div class="form-group">
+            <label for="admin-create-user-name">用户名 / 昵称 (3-20位)</label>
+            <input type="text" id="admin-create-user-name" class="modal-input" required maxlength="20" placeholder="例如: alex_tan">
+            <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 2px;">支持字母、数字、中文、下划线及减号，不可包含空格</small>
+          </div>
+
+          <div class="form-group">
+            <label for="admin-create-user-password">初始密码 (不少于6位)</label>
+            <input type="text" id="admin-create-user-password" class="modal-input" required minlength="6" placeholder="输入初始登录密码">
+          </div>
+
+          <div class="form-row-2col">
+            <div class="form-group">
+              <label for="admin-create-user-role">用户角色权限</label>
+              <select id="admin-create-user-role" class="modal-select">
+                <option value="user">👤 普通用户 (Standard User)</option>
+                <option value="manager">🛡️ 二级管理员 (Manager)</option>
+                <option value="admin">👑 超级管理员 (Super Admin)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="admin-create-user-status">账号初始状态</label>
+              <select id="admin-create-user-status" class="modal-select">
+                <option value="active">🟢 正常 (Active)</option>
+                <option value="suspended">🔴 冻结 (Suspended)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Sub-Apps Access Selection (Create Modal) -->
+          <div class="form-group" style="margin-top: 6px;">
+            <label class="form-label" style="font-weight:600; margin-bottom:6px; display:block;">📱 开放访问应用授权 (Sub-Apps Access)</label>
+            <div style="display:flex; flex-direction:column; gap:8px; padding:10px 12px; background:var(--surface-hover, rgba(255,255,255,0.04)); border:1px solid var(--border-subtle, rgba(255,255,255,0.1)); border-radius:var(--radius-md);">
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:500;">
+                <input type="checkbox" id="admin-create-app-courtledger" value="courtledger" checked>
+                <span>🏸 <strong>Court Ledger</strong> (羽球 AA 账单与分摊)</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:500;">
+                <input type="checkbox" id="admin-create-app-advancemanager" value="advancemanager" checked>
+                <span>🌴 <strong>Advance Manager</strong> (垫付归集与债务对冲)</span>
+              </label>
+              <label id="admin-create-app-admin-label" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:500;">
+                <input type="checkbox" id="admin-create-app-admin" value="admin">
+                <span>⚙️ <strong>Admin Console</strong> (全站系统管理控制台)</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Action Permissions Selection (Create Modal) -->
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label" style="font-weight:600; margin-bottom:6px; display:block;">🔧 细粒度功能操作权限 (Action Permissions)</label>
+            <div style="display:flex; flex-direction:column; gap:10px; padding:12px; background:var(--surface-hover, rgba(255,255,255,0.04)); border:1px solid var(--border-subtle, rgba(255,255,255,0.1)); border-radius:var(--radius-md); font-size:0.82rem;">
+              <div id="admin-create-perms-admin-group" style="border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.08)); padding-bottom: 8px;">
+                <div style="font-weight: 600; color: var(--accent, #38bdf8); margin-bottom: 4px;">👑 Admin 控制台操作</div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:6px;">
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-create-perm" value="admin:create_user" checked>
+                    <span>创建新用户</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-create-perm" value="admin:delete_user">
+                    <span>删除用户账号</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-create-perm" value="admin:edit_user" checked>
+                    <span>编辑用户/重置密码</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-create-perm" value="admin:manage_venues" checked>
+                    <span>管理球场数据</span>
+                  </label>
+                </div>
+              </div>
+
+              <div style="border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.08)); padding-bottom: 8px;">
+                <div style="font-weight: 600; color: #f59e0b; margin-bottom: 4px;">🏸 Court Ledger 羽球操作</div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:6px;">
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-create-perm" value="courtledger:create_bill" checked>
+                    <span>创建与保存账单</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-create-perm" value="courtledger:delete_bill" checked>
+                    <span>删除历史账单</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <div style="font-weight: 600; color: #10b981; margin-bottom: 4px;">🌴 Advance Manager 垫付操作</div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:6px;">
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-create-perm" value="advancemanager:create_expense" checked>
+                    <span>新增垫付记录</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-create-perm" value="advancemanager:delete_expense" checked>
+                    <span>删除/取消垫付</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-create-perm" value="advancemanager:settle" checked>
+                    <span>还款平账与结清</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-create-perm" value="advancemanager:manage_people" checked>
+                    <span>增删涉及人物</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions" style="margin-top: 16px;">
+            <button type="submit" id="btn-submit-admin-create-user" class="btn-primary-action">➕ 立即创建用户</button>
+            <button type="button" id="btn-cancel-admin-create-user" class="btn-secondary-action">取消</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Admin Edit User Modal -->
   <div id="admin-edit-user-modal" class="modal-overlay hidden">
     <div class="modal-card">
@@ -1319,8 +1532,9 @@
             <div class="form-group">
               <label for="admin-edit-user-role">用户角色权限</label>
               <select id="admin-edit-user-role" class="modal-select">
-                <option value="user">Standard User (普通用户)</option>
-                <option value="admin">Administrator (管理员)</option>
+                <option value="user">👤 普通用户 (Standard User)</option>
+                <option value="manager">🛡️ 二级管理员 (Manager)</option>
+                <option value="admin">👑 超级管理员 (Super Admin)</option>
               </select>
             </div>
             <div class="form-group">
@@ -1329,6 +1543,89 @@
                 <option value="active">🟢 正常 (Active)</option>
                 <option value="suspended">🔴 冻结 (Suspended)</option>
               </select>
+            </div>
+          </div>
+
+          <!-- Sub-Apps Access Selection (Edit Modal) -->
+          <div class="form-group" style="margin-top: 6px;">
+            <label class="form-label" style="font-weight:600; margin-bottom:6px; display:block;">📱 开放访问应用授权 (Sub-Apps Access)</label>
+            <div style="display:flex; flex-direction:column; gap:8px; padding:10px 12px; background:var(--surface-hover, rgba(255,255,255,0.04)); border:1px solid var(--border-subtle, rgba(255,255,255,0.1)); border-radius:var(--radius-md);">
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:500;">
+                <input type="checkbox" id="admin-edit-app-courtledger" value="courtledger">
+                <span>🏸 <strong>Court Ledger</strong> (羽球 AA 账单与分摊)</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:500;">
+                <input type="checkbox" id="admin-edit-app-advancemanager" value="advancemanager">
+                <span>🌴 <strong>Advance Manager</strong> (垫付归集与债务对冲)</span>
+              </label>
+              <label id="admin-edit-app-admin-label" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:500;">
+                <input type="checkbox" id="admin-edit-app-admin" value="admin">
+                <span>⚙️ <strong>Admin Console</strong> (全站系统管理控制台)</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Action Permissions Selection (Edit Modal) -->
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label" style="font-weight:600; margin-bottom:6px; display:block;">🔧 细粒度功能操作权限 (Action Permissions)</label>
+            <div style="display:flex; flex-direction:column; gap:10px; padding:12px; background:var(--surface-hover, rgba(255,255,255,0.04)); border:1px solid var(--border-subtle, rgba(255,255,255,0.1)); border-radius:var(--radius-md); font-size:0.82rem;">
+              <div id="admin-edit-perms-admin-group" style="border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.08)); padding-bottom: 8px;">
+                <div style="font-weight: 600; color: var(--accent, #38bdf8); margin-bottom: 4px;">👑 Admin 控制台操作</div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:6px;">
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-edit-perm" value="admin:create_user">
+                    <span>创建新用户</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-edit-perm" value="admin:delete_user">
+                    <span>删除用户账号</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-edit-perm" value="admin:edit_user">
+                    <span>编辑用户/重置密码</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-edit-perm" value="admin:manage_venues">
+                    <span>管理球场数据</span>
+                  </label>
+                </div>
+              </div>
+
+              <div style="border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.08)); padding-bottom: 8px;">
+                <div style="font-weight: 600; color: #f59e0b; margin-bottom: 4px;">🏸 Court Ledger 羽球操作</div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:6px;">
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-edit-perm" value="courtledger:create_bill">
+                    <span>创建与保存账单</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-edit-perm" value="courtledger:delete_bill">
+                    <span>删除历史账单</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <div style="font-weight: 600; color: #10b981; margin-bottom: 4px;">🌴 Advance Manager 垫付操作</div>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:6px;">
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-edit-perm" value="advancemanager:create_expense">
+                    <span>新增垫付记录</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-edit-perm" value="advancemanager:delete_expense">
+                    <span>删除/取消垫付</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-edit-perm" value="advancemanager:settle">
+                    <span>还款平账与结清</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" name="admin-edit-perm" value="advancemanager:manage_people">
+                    <span>增删涉及人物</span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1800,6 +2097,64 @@
     </div>
   </div>
 
+  <!-- Modal 9: Smart Roster Import & Payment Tracking (接龙名单与收款核销看板) -->
+  <div id="court-roster-modal" class="modal-overlay modal-fullscreen hidden">
+    <div class="modal-card modal-roster-card">
+      <div class="modal-header">
+        <div class="roster-header-left">
+          <h3 class="modal-title">🏸 球局接龙名单与收款核销看板</h3>
+          <span class="roster-subtitle">支持微信/WhatsApp 接龙一键解析 (6~25人) · 独立账单核销</span>
+        </div>
+        <button type="button" class="modal-close-btn" id="roster-modal-close">&times;</button>
+      </div>
+
+      <div class="modal-body roster-modal-body">
+        <!-- Section 1: Raw Textarea Import -->
+        <div class="roster-input-box">
+          <div class="roster-input-header">
+            <label for="roster-raw-text">📋 粘贴群接龙名单 (自动提取场地/时段/序号/Host/加人/候补)</label>
+            <button type="button" id="btn-clear-roster-text" class="btn-text-link">清空文本</button>
+          </div>
+          <textarea id="roster-raw-text" class="roster-textarea" placeholder="例如：&#10;📍Lavana Setapak &#10;🗓️15/8/2026 (Saturday) &#10;🕓4pm-6pm &#10;1. Siow&#10;2. Toh&#10;3. nick +1&#10;4. Dickson (Host)..."></textarea>
+          <div class="roster-input-actions">
+            <button type="button" id="btn-parse-roster" class="btn-primary-action">✨ 智能解析并填入计算器</button>
+          </div>
+        </div>
+
+        <!-- Section 2: Payment Progress & Toolbar -->
+        <div class="roster-dashboard-box">
+          <div class="roster-summary-bar">
+            <div class="summary-stat-item">
+              <span class="summary-label">👥 参与人数</span>
+              <span id="roster-player-count-badge" class="summary-val">0 人</span>
+            </div>
+            <div class="summary-stat-item flex-grow">
+              <span class="summary-label">💵 收款进度</span>
+              <span id="roster-paid-stats" class="summary-val">已收 0 / 0 人</span>
+              <div class="roster-progress-track">
+                <div id="roster-progress-fill" class="roster-progress-fill" style="width: 0%;"></div>
+              </div>
+            </div>
+            <div class="summary-actions">
+              <button type="button" id="btn-copy-roster-progress" class="btn-pill-action btn-copy-progress">📋 复制群收款接龙</button>
+              <button type="button" id="btn-roster-mark-all-paid" class="btn-pill-action btn-mark-all">✅ 全员已付</button>
+            </div>
+          </div>
+
+          <!-- Section 3: Player Cards Grid -->
+          <div id="roster-player-list" class="roster-player-grid">
+            <!-- Dynamic player cards -->
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer roster-modal-footer">
+        <button type="button" id="btn-roster-sync-am" class="btn-primary-action btn-sync-am" style="background: linear-gradient(135deg, #10b981, #059669); margin-right: 8px;">🚀 生成独立账单并流转至垫付管家 ➔</button>
+        <button type="button" id="btn-roster-copy-bill" class="btn-secondary-action" onclick="CourtLedgerBill.copyCalculatedBillText()">📋 复制账单文案</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Categorized JS Module Scripts (Supports both file:// double-click & HTTP server) -->
   <script src="js/core/auth.js"></script>
   <script src="js/core/router.js"></script>
@@ -1810,6 +2165,7 @@
   <script src="js/courtledger/ui.js"></script>
   <script src="js/courtledger/swipe.js"></script>
   <script src="js/courtledger/bill.js"></script>
+  <script src="js/courtledger/roster.js"></script>
   <script src="js/courtledger/qr.js"></script>
   <script src="js/admin/admin.js"></script>
   <script src="js/advancemanager/formatters.js"></script>

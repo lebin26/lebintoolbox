@@ -251,24 +251,31 @@ Allows an authenticated user to edit their own username and/or password.
 ---
 
 ### 11. Admin Dashboard Analytics
-Retrieves total system metrics (Users, Active/Suspended, Bills, Profit).
+Retrieves total system metrics (Users, Active/Suspended, Admins, Managers, Bills, Profit).
 
 - **Method**: `GET`
 - **Endpoint**: `/api/admin/dashboard`
 - **Header**: `Authorization: Bearer <token>`
-- **Authorization**: Requires `user.role === 'admin'`. Otherwise returns `403 Forbidden`.
+- **Authorization**: Requires `user.role === 'admin' || user.role === 'manager'`. Otherwise returns `403 Forbidden`.
 
 ---
 
-### 12. Admin User Management & Audit Logs
-- `GET /api/admin/users`: List users with search & filters.
-- `GET /api/admin/users/:id`: Get detailed user information.
+### 12. Admin User Management & RBAC Hierarchy
+- `POST /api/admin/users`: Directly create a new user account with `allowedApps` permissions (Admin can create `admin`, `manager`, or `user`; Manager can only create `user`).
+- `GET /api/admin/users`: List users with search & filters, including `allowedApps` array for each user.
+- `GET /api/admin/users/:id`: Get detailed user information including `allowedApps`.
 - `GET /api/admin/users/:id/bills`: Get all bills belonging to a specific user.
-- `PATCH /api/admin/users/:id`: Update user username, email, password, role, or status with Audit Log.
-- `POST /api/admin/users/:id/suspend`: Freeze user account.
+- `PATCH /api/admin/users/:id`: Update username, email, password, role, status, and `allowedApps` permissions with Audit Log.
+- `POST /api/admin/users/:id/suspend`: Freeze user account (Manager cannot freeze Admin/Manager).
 - `POST /api/admin/users/:id/activate`: Re-activate user account.
-- `DELETE /api/admin/users/:id`: Permanently delete a user account with safety checks and Audit Log.
+- `DELETE /api/admin/users/:id`: Permanently delete a user account (Manager cannot delete Admin/Manager).
+- `GET /api/admin/app-access-stats`: Sub-App access coverage analytics & user access breakdown for each sub-app (`courtledger`, `advancemanager`, `admin`).
 - `GET /api/admin/logs`: View admin audit trail.
+
+**Role Hierarchy Levels**:
+1. `admin` (超级管理员 Super Admin, Rank 100): Full absolute priority. Can manage all users, managers, system settings, and assign any role & sub-app permissions.
+2. `manager` (二级管理员 Manager, Rank 50): Operational admin rights. Can create and manage standard `user` accounts and non-admin sub-apps, view bills/venues, but **strictly cannot modify, freeze, delete, or elevate permissions over `admin` accounts**.
+3. `user` (普通用户 Standard User, Rank 10): Standard user functions within authorized sub-apps.
 
 ---
 

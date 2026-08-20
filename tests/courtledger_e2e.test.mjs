@@ -192,6 +192,21 @@ test('Worker API - Multi-Tenant Account-Isolated Bills CRUD', { skip: skipReason
     headers: { 'Authorization': `Bearer ${tokenB}` }
   });
   assert.equal(delBRes.status, 200);
+
+  // 10. Clean up test users so no dummy records remain in DB
+  const adminToken = Buffer.from(JSON.stringify({ userId: 1, role: 'admin', ts: Date.now() })).toString('base64');
+  if (userA.user?.id) {
+    await fetch(`${WORKER_URL}/api/admin/users/${userA.user.id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+  }
+  if (userB.user?.id) {
+    await fetch(`${WORKER_URL}/api/admin/users/${userB.user.id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+  }
 });
 
 test('Worker API - User Profile & Admin Edit User', { skip: skipReason }, async () => {

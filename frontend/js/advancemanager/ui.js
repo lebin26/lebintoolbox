@@ -9,7 +9,7 @@
  */
 
 window.AdvanceManagerUI = (function () {
-  const { formatMYR, parseCents, formatDate } = window.AMFormatters;
+  const { formatMYR, parseCents, formatDate, escapeHtml } = window.AMFormatters;
   const state = window.AMState.get();
 
   // Split builder internal state
@@ -31,8 +31,8 @@ window.AdvanceManagerUI = (function () {
   const sectionTitles = {
     dashboard: '📊 垫付总览看板',
     expenses: '🧾 垫付记录清单',
-    people: '👥 涉及人物档案与往来账',
-    projects: '🌴 活动与旅行归集项目',
+    people: '👥 涉及人物档案与通讯录',
+    projects: '🌴 活动归集与球局项目',
     settlements: '🤝 还款与平账结算流水'
   };
 
@@ -154,11 +154,21 @@ window.AdvanceManagerUI = (function () {
     console.log('[AM] switchTab called with:', tabKey);
     if (!tabKey) return;
     try {
+      if (tabKey === 'badminton') {
+        tabKey = 'projects';
+        projectTypeFilter = 'badminton';
+        const allBtn = document.getElementById('am-filter-proj-all');
+        const badBtn = document.getElementById('am-filter-proj-badminton');
+        const tripBtn = document.getElementById('am-filter-proj-trips');
+        if (allBtn) allBtn.classList.remove('active');
+        if (badBtn) badBtn.classList.add('active');
+        if (tripBtn) tripBtn.classList.remove('active');
+      }
+
       if (window.AMState && typeof window.AMState.setTab === 'function') {
         window.AMState.setTab(tabKey);
       }
       const tabs = document.querySelectorAll('#am-sidebar .am-tab-btn');
-      console.log('[AM] Found sidebar tab buttons:', tabs.length);
       tabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === tabKey));
 
       const titleEl = document.getElementById('am-section-title');
@@ -172,9 +182,6 @@ window.AdvanceManagerUI = (function () {
         if (el) {
           const shouldHide = (k !== tabKey);
           el.classList.toggle('hidden', shouldHide);
-          console.log('[AM] Section am-tab-' + k, shouldHide ? 'HIDDEN' : 'VISIBLE');
-        } else {
-          console.warn('[AM] Section element NOT FOUND: am-tab-' + k);
         }
       });
 
@@ -439,23 +446,30 @@ window.AdvanceManagerUI = (function () {
     });
   }
 
+  function filterPersonType(type) {
+    refreshPersons();
+  }
+
   function renderPersons(persons) {
     const listEl = document.getElementById('am-persons-list');
     if (!listEl) return;
 
-    if (!persons || persons.length === 0) {
+    // Pure isolated sandbox: only user's permanent contacts are shown in People tab
+    const permanentPersons = (persons || []).filter(p => p.isSelf || (!p.is_temporary && p.person_type !== 'temporary'));
+
+    if (permanentPersons.length === 0) {
       listEl.innerHTML = `
         <div class="am-empty-state">
           <div class="am-empty-icon">👥</div>
-          <div class="am-empty-title">暂无人物档案</div>
-          <div style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:var(--space-4);">添加常用朋友/同事，快速发起垫付平摊</div>
+          <div class="am-empty-title">暂无常驻人物档案</div>
+          <div style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:var(--space-4);">添加常用朋友/同事，快速发起垫付平摊。球局临时名单已在【活动与球局】独立沙盒管理</div>
           <button class="am-btn-primary" onclick="AdvanceManagerUI.openNewPersonModal()">+ 添加人物</button>
         </div>
       `;
       return;
     }
 
-    const sortedList = sortPersonsList(persons, currentPersonSort);
+    const sortedList = sortPersonsList(permanentPersons, currentPersonSort);
 
     listEl.innerHTML = sortedList.map(p => {
       let balanceTag = '';
@@ -469,7 +483,6 @@ window.AdvanceManagerUI = (function () {
         balanceTag = `<span class="am-item-amount settled">已结清</span>`;
       }
 
-      const tempBadge = p.is_temporary ? `<span class="am-pill-badge temp" style="margin-left:4px;">临时</span>` : '';
       const favBtn = !p.isSelf ? `
         <button type="button" class="am-fav-btn ${p.is_favourite ? 'active' : ''}" title="${p.is_favourite ? '取消收藏' : '标为常用/收藏'}" onclick="event.stopPropagation(); AdvanceManagerUI.toggleFavourite('${p.id}')">
           ${p.is_favourite ? '❤️' : '🤍'}
@@ -483,9 +496,8 @@ window.AdvanceManagerUI = (function () {
             <div class="am-item-meta">
               <div style="display:flex; align-items:center;">
                 <span class="am-item-title">${p.name} ${p.nickname ? `(${p.nickname})` : ''}</span>
-                ${tempBadge}
               </div>
-              <span class="am-item-desc">${p.phone || p.email || (p.isSelf ? '系统主账号' : (p.is_temporary ? '单次临时人物' : '常驻通讯录人物'))}</span>
+              <span class="am-item-desc">${p.phone || p.email || (p.isSelf ? '系统主账号' : '👥 常驻通讯录好友')}</span>
             </div>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
@@ -510,54 +522,443 @@ window.AdvanceManagerUI = (function () {
   }
 
   // -------------------------------------------------------------
-  // 4. PROJECTS & TRIPS
+  // 4. PROJECTS & BADMINTON SESSIONS (UNIFIED)
   // -------------------------------------------------------------
-  async function refreshProjects() {
-    try {
-      const projs = await window.AMApi.getProjects();
-      window.AMState.setProjects(projs);
-      renderProjects(projs);
-    } catch (e) {
-      console.error('Projects load error:', e);
-    }
+  let projectTypeFilter = 'all'; // 'all' (active only) | 'badminton' (active only) | 'trips' (active only) | 'archived' (all settled/completed)
+
+  function filterProjectType(type) {
+    projectTypeFilter = type || 'all';
+    const allBtn = document.getElementById('am-filter-proj-all');
+    const badBtn = document.getElementById('am-filter-proj-badminton');
+    const tripBtn = document.getElementById('am-filter-proj-trips');
+    const archBtn = document.getElementById('am-filter-proj-archived');
+    if (allBtn) allBtn.classList.toggle('active', projectTypeFilter === 'all');
+    if (badBtn) badBtn.classList.toggle('active', projectTypeFilter === 'badminton');
+    if (tripBtn) tripBtn.classList.toggle('active', projectTypeFilter === 'trips');
+    if (archBtn) archBtn.classList.toggle('active', projectTypeFilter === 'archived');
+    refreshProjects();
   }
 
-  function renderProjects(projs) {
+  async function refreshProjects() {
     const listEl = document.getElementById('am-projects-list');
     if (!listEl) return;
 
-    if (!projs || projs.length === 0) {
-      listEl.innerHTML = `
-        <div class="am-empty-state">
-          <div class="am-empty-icon">🌴</div>
-          <div class="am-empty-title">暂无活动或旅行项目</div>
-          <div style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:var(--space-4);">为出游聚会创建专属项目，一键生成活动独立清账报告</div>
-          <button class="am-btn-primary" onclick="AdvanceManagerUI.openNewProjectModal()">+ 创建新项目</button>
-        </div>
-      `;
+    listEl.innerHTML = '<div class="am-empty-state"><div class="am-empty-icon">⏳</div><div class="am-empty-title">正在加载活动与球局项目...</div></div>';
+
+    try {
+      const [rawProjsRes, expRes] = await Promise.all([
+        window.AMApi.getProjects(),
+        window.AMApi.getExpenses({ limit: 100 })
+      ]);
+
+      const rawProjs = Array.isArray(rawProjsRes) ? rawProjsRes : (rawProjsRes?.projects || rawProjsRes?.results || []);
+      const expenses = Array.isArray(expRes) ? expRes : (expRes.expenses || expRes.results || []);
+      window.AMState.setProjects(rawProjs);
+
+      renderProjectsUnified(rawProjs, expenses);
+    } catch (e) {
+      console.error('Projects load error:', e);
+      listEl.innerHTML = `<div class="am-empty-state"><div class="am-empty-title">⚠️ 加载项目失败: ${escapeHtml(e.message)}</div></div>`;
+    }
+  }
+
+  function isBadmintonItem(item) {
+    if (!item) return false;
+    const name = item.name || item.description || '';
+    const desc = item.description || '';
+    return name.includes('🏸') || name.includes('羽球') || name.includes('羽毛球') || name.includes('Court') || name.includes('Setapak') || name.includes('Lavana') || desc.includes('badminton_session') || desc.includes('Court Ledger');
+  }
+
+  function getSessionDataFromProject(pr, expenses = []) {
+    let sessionData = null;
+    try {
+      if (pr.description && pr.description.trim().startsWith('{')) {
+        const parsed = JSON.parse(pr.description);
+        if (parsed.type === 'badminton_session' && Array.isArray(parsed.players) && parsed.players.length > 0) {
+          sessionData = parsed;
+        }
+      }
+    } catch (e) {
+      sessionData = null;
+    }
+
+    if (!sessionData) {
+      const projExpenses = expenses.filter(e => e.project_id === pr.id || (!pr.id.startsWith('proj_') && e.id === pr.id));
+      const totalCostNum = (projExpenses.reduce((sum, e) => sum + (e.total_amount || 0), 0)) / 100;
+      const participantMap = new Map();
+      projExpenses.forEach(e => {
+        (e.participants || []).forEach(part => {
+          const rawName = (part.person_name || '球友').trim();
+          const nameKey = rawName.toLowerCase();
+          if (!nameKey.includes('host') && !nameKey.includes('我') && part.share_amount > 0) {
+            if (!participantMap.has(nameKey)) {
+              participantMap.set(nameKey, {
+                id: `pl_${participantMap.size + 1}`,
+                name: rawName,
+                fee: part.share_amount / 100,
+                isPaid: Boolean(part.is_settled)
+              });
+            }
+          }
+        });
+      });
+
+      const players = Array.from(participantMap.values());
+      const perPlayerFee = players.length > 0 ? (players[0].fee || (totalCostNum / players.length)) : 0;
+
+      sessionData = {
+        type: 'badminton_session',
+        venue: pr.name,
+        date: formatDate(pr.created_at),
+        totalCost: totalCostNum,
+        perPlayerFee: perPlayerFee,
+        players: players
+      };
+    }
+
+    return sessionData;
+  }
+
+  function renderProjectsUnified(rawProjs, expenses) {
+    const listEl = document.getElementById('am-projects-list');
+    if (!listEl) return;
+
+    // 1. Extract all Badminton Projects & Standalone Badminton Expenses
+    const activeBadmintonProjs = [];
+    const archivedBadmintonProjs = [];
+    const activeRegularProjs = [];
+    const archivedRegularProjs = [];
+    const seenBadmintonIds = new Set();
+
+    (rawProjs || []).forEach(p => {
+      if (isBadmintonItem(p)) {
+        const sessionData = getSessionDataFromProject(p, expenses);
+        const isSettled = (p.status === 'settled') || (sessionData.players.length > 0 && sessionData.players.every(pl => pl.isPaid));
+        if (isSettled) {
+          archivedBadmintonProjs.push(p);
+        } else {
+          activeBadmintonProjs.push(p);
+        }
+        seenBadmintonIds.add(p.id);
+      } else {
+        const isSettled = (p.status === 'settled');
+        if (isSettled) {
+          archivedRegularProjs.push(p);
+        } else {
+          activeRegularProjs.push(p);
+        }
+      }
+    });
+
+    (expenses || []).forEach(e => {
+      if (isBadmintonItem(e)) {
+        const matchingProj = e.project_id && rawProjs.find(pr => pr.id === e.project_id);
+        if (!matchingProj && !seenBadmintonIds.has(e.id)) {
+          const fakeProj = {
+            id: e.project_id || e.id,
+            name: e.description,
+            description: '由 Court Ledger 导入的羽球局账单',
+            created_at: e.created_at || e.transaction_date,
+            isExpenseFallback: true,
+            status: e.status === 'settled' ? 'settled' : 'active'
+          };
+          const sessionData = getSessionDataFromProject(fakeProj, expenses);
+          const isSettled = (fakeProj.status === 'settled') || (sessionData.players.length > 0 && sessionData.players.every(pl => pl.isPaid));
+          if (isSettled) {
+            archivedBadmintonProjs.push(fakeProj);
+          } else {
+            activeBadmintonProjs.push(fakeProj);
+          }
+          seenBadmintonIds.add(e.id);
+        }
+      }
+    });
+
+    // 2. Filter by current projectTypeFilter
+    let displayBadminton = [];
+    let displayRegular = [];
+
+    if (projectTypeFilter === 'all') {
+      displayBadminton = activeBadmintonProjs;
+      displayRegular = activeRegularProjs;
+    } else if (projectTypeFilter === 'badminton') {
+      displayBadminton = activeBadmintonProjs;
+      displayRegular = [];
+    } else if (projectTypeFilter === 'trips') {
+      displayBadminton = [];
+      displayRegular = activeRegularProjs;
+    } else if (projectTypeFilter === 'archived') {
+      displayBadminton = archivedBadmintonProjs;
+      displayRegular = archivedRegularProjs;
+    }
+
+    const totalCount = displayBadminton.length + displayRegular.length;
+
+    if (totalCount === 0) {
+      if (projectTypeFilter === 'badminton') {
+        listEl.innerHTML = `
+          <div class="am-empty-state">
+            <div class="am-empty-icon">🏸</div>
+            <div class="am-empty-title">暂无待结清羽球局</div>
+            <div style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:var(--space-4);">
+              所有球局款项已收齐并自动移入【📁 已结清归档】。可前往 Court Ledger 导入新球局
+            </div>
+            <button class="am-btn-primary" onclick="if (window.AppRouter && window.AppRouter.switchView) { window.AppRouter.switchView('courtledger'); if (window.CourtLedgerRoster && window.CourtLedgerRoster.openRosterModal) { window.CourtLedgerRoster.openRosterModal(); } }">前往 Court Ledger 导入接龙 ➔</button>
+          </div>
+        `;
+      } else if (projectTypeFilter === 'trips') {
+        listEl.innerHTML = `
+          <div class="am-empty-state">
+            <div class="am-empty-icon">🌴</div>
+            <div class="am-empty-title">暂无待结清旅行聚会</div>
+            <div style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:var(--space-4);">
+              为出游聚会创建专属项目，一键生成活动独立清账报告
+            </div>
+            <button class="am-btn-primary" onclick="AdvanceManagerUI.openNewProjectModal()">+ 创建新项目</button>
+          </div>
+        `;
+      } else if (projectTypeFilter === 'archived') {
+        listEl.innerHTML = `
+          <div class="am-empty-state">
+            <div class="am-empty-icon">📁</div>
+            <div class="am-empty-title">暂无已结清归档项目</div>
+            <div style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:var(--space-4);">
+              当球局或活动项目所有款项全部收齐结清后，将自动归档移入此处保管
+            </div>
+          </div>
+        `;
+      } else {
+        listEl.innerHTML = `
+          <div class="am-empty-state">
+            <div class="am-empty-icon">✨</div>
+            <div class="am-empty-title">所有活动与球局已全部结清</div>
+            <div style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:var(--space-4);">
+              当前没有正在进行中的待收款项。已结清的历史球局可在【📁 已结清归档】中随时查阅
+            </div>
+            <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+              <button class="am-btn-secondary" onclick="AdvanceManagerUI.filterProjectType('archived')">📁 查看已结清归档 (${archivedBadmintonProjs.length + archivedRegularProjs.length})</button>
+              <button class="am-btn-primary" onclick="if (window.AppRouter && window.AppRouter.switchView) { window.AppRouter.switchView('courtledger'); if (window.CourtLedgerRoster && window.CourtLedgerRoster.openRosterModal) { window.CourtLedgerRoster.openRosterModal(); } }">🏸 前往 Court Ledger 导入接龙 ➔</button>
+            </div>
+          </div>
+        `;
+      }
       return;
     }
 
-    listEl.innerHTML = `
-      <div class="am-project-grid">
-        ${projs.map(p => `
+    let html = '';
+
+    // 3. Render Badminton Session Cards (Pure Isolated Sandbox Mode)
+    if (displayBadminton.length > 0) {
+      if (projectTypeFilter === 'all' || projectTypeFilter === 'archived') {
+        const prefix = projectTypeFilter === 'archived' ? '📁 已归档羽球局' : '🏸 待收羽球球局';
+        html += `<div style="font-size:0.9rem; font-weight:800; color:var(--color-text-primary); margin-bottom:var(--space-3); display:flex; align-items:center; gap:6px;">${prefix} (${displayBadminton.length})</div>`;
+      }
+
+      html += `<div class="am-session-grid" style="margin-bottom:var(--space-5);">`;
+      html += displayBadminton.map(pr => {
+        const sessionData = getSessionDataFromProject(pr, expenses);
+        const players = sessionData.players || [];
+        const unpaidPlayers = players.filter(p => !p.isPaid);
+        const paidPlayers = players.filter(p => p.isPaid);
+        const isAllSettled = players.length > 0 && unpaidPlayers.length === 0;
+        const pendingAmount = unpaidPlayers.reduce((s, p) => s + (p.fee || 0), 0);
+        const totalCost = sessionData.totalCost || (players.reduce((s, p) => s + (p.fee || 0), 0));
+
+        return `
+          <div class="am-session-card" id="session-card-${pr.id}">
+            <div class="am-session-header">
+              <div>
+                <div class="am-session-title">${escapeHtml(pr.name)}</div>
+                <div class="am-session-meta">🏸 羽球局独立收款清单 · 📅 ${formatDate(pr.created_at)}</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="am-pill-badge ${isAllSettled ? 'settled' : 'active'}">${isAllSettled ? '🎉 本场已全部结清' : `⏳ ${unpaidPlayers.length} 人待付`}</span>
+                <div style="font-size:1.15rem; font-weight:800; color:var(--color-text-primary); margin-top:4px;">RM ${totalCost.toFixed(2)}</div>
+              </div>
+            </div>
+
+            <div class="am-session-stats-bar">
+              <div style="font-size:0.88rem; font-weight:700; color:var(--color-text-primary);">
+                ${isAllSettled ? `🎉 <strong>全场已结清</strong>：共 ${players.length} 位球友款项已全部收齐` : `👥 <strong>待收清单</strong>：<strong>${unpaidPlayers.length}</strong> 人未付 · 待收 <strong>RM ${pendingAmount.toFixed(2)}</strong> (已付 ${paidPlayers.length}/${players.length} 人)`}
+              </div>
+              <div style="display:flex; gap:8px;">
+                ${!isAllSettled ? `
+                  <button type="button" class="am-btn-primary" style="padding:4px 12px; font-size:0.8rem;" onclick="AdvanceManagerUI.settleAllBadmintonPlayers('${pr.id}')">
+                    ✅ 一键全场结清 (${unpaidPlayers.length}人)
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+
+            ${!isAllSettled ? `
+              <div class="am-session-players-grid">
+                ${unpaidPlayers.map((pl, pidx) => `
+                  <div class="am-session-player-item is-unpaid" id="player-item-${pr.id}-${pidx}">
+                    <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                      <span style="font-size:0.78rem; font-weight:800; color:var(--color-text-muted); width:18px;">${pidx + 1}.</span>
+                      <div style="min-width:0;">
+                        <strong style="font-size:0.9rem; color:var(--color-text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">${escapeHtml(pl.name)}</strong>
+                        <div style="font-size:0.76rem; color:#d97706; font-weight:800;">
+                          ⏳ 待付 RM ${(pl.fee || 0).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                      <button type="button" class="am-btn-secondary" style="padding:3px 6px; font-size:0.74rem;" onclick="AdvanceManagerUI.copyBadmintonReminder(this.dataset.player, this.dataset.fee, this.dataset.session)" data-player="${escapeHtml(pl.name)}" data-fee="RM ${(pl.fee || 0).toFixed(2)}" data-session="${escapeHtml(pr.name)}">
+                        💬 催账
+                      </button>
+                      <button type="button" class="am-btn-primary" style="padding:3px 8px; font-size:0.74rem;" onclick="AdvanceManagerUI.settleBadmintonPlayer('${pr.id}', this.dataset.player)" data-player="${escapeHtml(pl.name)}">
+                        结清
+                      </button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : `
+              <div style="padding:var(--space-3); background:rgba(16,185,129,0.08); border-radius:var(--radius-md); text-align:center; color:#10b981; font-size:0.88rem; font-weight:700;">
+                ✨ 本场球局所有款项已全部结清平账，无任何待收人员
+              </div>
+            `}
+
+            ${paidPlayers.length > 0 ? `
+              <details style="margin-top:10px; font-size:0.8rem; color:var(--color-text-muted); cursor:pointer;">
+                <summary style="user-select:none; font-weight:600;">✓ 已结清球友 (${paidPlayers.length} 人) 点击展开</summary>
+                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+                  ${paidPlayers.map(p => `<span class="am-pill-badge settled" style="font-size:0.74rem;">✓ ${escapeHtml(p.name)} (RM ${(p.fee || 0).toFixed(2)})</span>`).join('')}
+                </div>
+              </details>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+      html += `</div>`;
+    }
+
+    // 4. Render Regular Travel / Activity Projects
+    if (displayRegular.length > 0) {
+      if (projectTypeFilter === 'all') {
+        html += `<div style="font-size:0.9rem; font-weight:800; color:var(--color-text-primary); margin-bottom:var(--space-3); display:flex; align-items:center; gap:6px;">🌴 旅行与聚会项目 (${displayRegular.length})</div>`;
+      }
+
+      html += `<div class="am-project-grid">`;
+      html += displayRegular.map(p => {
+        const projExpenses = expenses.filter(e => e.project_id === p.id);
+        const totalProjCost = projExpenses.reduce((sum, e) => sum + (e.total_amount || 0), 0);
+
+        return `
           <div class="am-project-card" onclick="AdvanceManagerUI.openProjectDetail('${p.id}')">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <strong style="font-size:1.05rem; color:var(--color-text-primary);">${p.name}</strong>
-              <span class="am-pill-badge settled">${p.status.toUpperCase()}</span>
+              <strong style="font-size:1.05rem; color:var(--color-text-primary);">${escapeHtml(p.name)}</strong>
+              <span class="am-pill-badge settled">${(p.status || 'ACTIVE').toUpperCase()}</span>
             </div>
             <div style="font-size:0.82rem; color:var(--color-text-muted);">
-              ${p.description || '无项目描述'}
+              ${escapeHtml(p.description || '无项目描述')}
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:var(--color-text-muted); border-top:1px solid var(--color-border-subtle); padding-top:6px; margin-top:4px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; font-weight:700; color:var(--color-text-primary); margin-top:6px;">
+              <span>总支出: ${formatMYR(totalProjCost)}</span>
+              <span style="font-size:0.78rem; font-weight:normal; color:var(--color-text-muted);">${projExpenses.length} 笔垫付</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:var(--color-text-muted); border-top:1px solid var(--color-border-subtle); padding-top:6px; margin-top:6px;">
               <span>📅 ${formatDate(p.created_at)}</span>
               <span style="color:var(--color-primary); font-weight:600;">查看详情 ➔</span>
             </div>
           </div>
-        `).join('')}
-      </div>
-    `;
+        `;
+      }).join('');
+      html += `</div>`;
+    }
+
+    listEl.innerHTML = html;
   }
+
+  function copyBadmintonReminder(playerName, feeStr, sessionName) {
+    const pName = (playerName || '球友').trim();
+    const sName = (sessionName || '羽球活动').trim();
+    const fee = (feeStr || '').trim();
+    const msg = `@${pName} 🏸 今日羽球活动 (${sName}) 费用 ${fee}，请扫码或转账付款，谢谢！`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(msg).then(() => toast(`已复制 @${pName} 的催账文案！`)).catch(() => {
+        toast(`催账文案: ${msg}`);
+      });
+    } else {
+      toast(`催账文案: ${msg}`);
+    }
+  }
+
+  async function settleBadmintonPlayer(projectId, playerName) {
+    try {
+      const [rawProjsRes, expRes] = await Promise.all([
+        window.AMApi.getProjects(),
+        window.AMApi.getExpenses({ limit: 100 })
+      ]);
+      const rawProjs = Array.isArray(rawProjsRes) ? rawProjsRes : (rawProjsRes?.projects || rawProjsRes?.results || []);
+      const expenses = Array.isArray(expRes) ? expRes : (expRes.expenses || expRes.results || []);
+      let targetProj = rawProjs.find(pr => pr.id === projectId);
+
+      if (!targetProj) {
+        throw new Error('未找到对应球局项目');
+      }
+
+      const sessionData = getSessionDataFromProject(targetProj, expenses);
+      const targetKey = (playerName || '').trim().toLowerCase();
+      let matched = false;
+
+      sessionData.players.forEach(p => {
+        if (p.name.trim().toLowerCase() === targetKey) {
+          p.isPaid = true;
+          matched = true;
+        }
+      });
+
+      const allPaid = sessionData.players.length > 0 && sessionData.players.every(p => p.isPaid);
+      const newStatus = allPaid ? 'settled' : 'active';
+
+      await window.AMApi.updateProject(projectId, {
+        description: JSON.stringify(sessionData),
+        status: newStatus
+      });
+
+      toast(`🎉 ${playerName} 款项已标记为【已结清】！`);
+      await refreshProjects();
+    } catch (err) {
+      console.error('settleBadmintonPlayer error:', err);
+      toast('❌ 结清失败: ' + err.message);
+    }
+  }
+
+  async function settleAllBadmintonPlayers(projectId) {
+    if (!confirm('确定要将本场所有待付球友一键全部标记为【已结清】吗？')) return;
+
+    try {
+      toast('⏳ 正在一键全场结清...');
+      const [rawProjsRes, expRes] = await Promise.all([
+        window.AMApi.getProjects(),
+        window.AMApi.getExpenses({ limit: 100 })
+      ]);
+      const rawProjs = Array.isArray(rawProjsRes) ? rawProjsRes : (rawProjsRes?.projects || rawProjsRes?.results || []);
+      const expenses = Array.isArray(expRes) ? expRes : (expRes.expenses || expRes.results || []);
+      const targetProj = rawProjs.find(pr => pr.id === projectId);
+      if (!targetProj) throw new Error('未找到对应球局项目');
+
+      const sessionData = getSessionDataFromProject(targetProj, expenses);
+      sessionData.players.forEach(p => {
+        p.isPaid = true;
+      });
+
+      await window.AMApi.updateProject(projectId, {
+        description: JSON.stringify(sessionData),
+        status: 'settled'
+      });
+
+      toast('🎉 本场球友账单已全部一键结清！');
+      await refreshProjects();
+    } catch (err) {
+      console.error('settleAllBadmintonPlayers error:', err);
+      toast('❌ 批量结清失败: ' + err.message);
+    }
+  }
+
+  const renderBadmintonSessions = refreshProjects;
 
   function openNewProjectModal() {
     const modal = document.getElementById('modal-am-project');
@@ -675,6 +1076,11 @@ window.AdvanceManagerUI = (function () {
   // 6. MODAL: NEW EXPENSE & SPLIT BUILDER
   // -------------------------------------------------------------
   function openNewExpenseModal() {
+    if (window.AuthManager && !window.AuthManager.hasActionPermission('advancemanager:create_expense')) {
+      toast('⛔ 权限不足：您当前暂无【新增垫付】的权限，请联系 Admin 开通！');
+      return;
+    }
+
     const modal = document.getElementById('modal-am-expense');
     if (!modal) return;
 
@@ -986,6 +1392,11 @@ window.AdvanceManagerUI = (function () {
   // 7. MODAL: NEW PERSON
   // -------------------------------------------------------------
   function openNewPersonModal() {
+    if (window.AuthManager && !window.AuthManager.hasActionPermission('advancemanager:manage_people')) {
+      toast('⛔ 权限不足：您当前暂无【添加人物】的权限，请联系 Admin 开通！');
+      return;
+    }
+
     const modal = document.getElementById('modal-am-person');
     if (!modal) return;
 
@@ -1034,6 +1445,11 @@ window.AdvanceManagerUI = (function () {
   let settleContext = null;
 
   async function openSettleModal(personIdOrFrom, toPersonId = null, suggestedAmountCents = 0) {
+    if (window.AuthManager && !window.AuthManager.hasActionPermission('advancemanager:settle')) {
+      toast('⛔ 权限不足：您当前暂无【平账与结算】的权限，请联系 Admin 开通！');
+      return;
+    }
+
     const modal = document.getElementById('modal-am-settle');
     if (!modal) return;
 
@@ -1270,6 +1686,11 @@ window.AdvanceManagerUI = (function () {
   }
 
   async function confirmCancelExpense(expenseId) {
+    if (window.AuthManager && !window.AuthManager.hasActionPermission('advancemanager:delete_expense')) {
+      toast('⛔ 权限不足：您当前暂无【删除/取消垫付记录】的权限，请联系 Admin 开通！');
+      return;
+    }
+
     if (!confirm('确定要取消此笔垫付吗？取消后该记录将不再计入债务余额，但会保留在历史记录中。')) return;
 
     try {
@@ -1371,7 +1792,7 @@ window.AdvanceManagerUI = (function () {
       toast('⏳ 正在执行历史冗余数据清理...');
       const res = await window.AMApi.cleanupSettledHistory();
       toast(res.message || '✅ 已清理历史已结账单！');
-      await Promise.all([refreshDashboard(), refreshExpenses(), refreshSettlements()]);
+      await Promise.all([refreshDashboard(), refreshPersons(), refreshExpenses(), refreshSettlements(), refreshProjects()]);
     } catch (e) {
       toast('❌ 清理失败: ' + e.message);
     }
@@ -1491,6 +1912,13 @@ window.AdvanceManagerUI = (function () {
     confirmCancelExpense,
     cleanupHistory,
     toggleFavourite,
+    filterPersonType,
+    filterProjectType,
+    renderBadmintonSessions,
+    refreshProjects,
+    copyBadmintonReminder,
+    settleBadmintonPlayer,
+    settleAllBadmintonPlayers,
     closeModal
   };
 })();

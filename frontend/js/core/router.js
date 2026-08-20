@@ -33,7 +33,6 @@
     function switchView(targetViewId, updateHash = true) {
       // 1. Auth Navigation Guard
       const isLoggedIn = window.AuthManager && window.AuthManager.isLoggedIn;
-      const isAdmin = window.AuthManager && window.AuthManager.isAdmin;
 
       if (!isLoggedIn && targetViewId !== 'login') {
         targetViewId = 'login';
@@ -41,11 +40,24 @@
         targetViewId = 'hub';
       }
 
-      if (targetViewId === 'admin' && !isAdmin) {
-        if (typeof window.showToast === 'function') {
-          window.showToast('⛔ 权限不足：仅管理员允许访问后台');
+      // 2. Sub-App Access Permission Guard
+      if (isLoggedIn && window.AuthManager && typeof window.AuthManager.hasAppAccess === 'function') {
+        if ((targetViewId === 'courtledger' || targetViewId === 'historybills') && !window.AuthManager.hasAppAccess('courtledger')) {
+          if (typeof window.showToast === 'function') {
+            window.showToast('⛔ 访问权限不足：您当前暂无【Court Ledger】的访问授权，请联系 Admin 开通！');
+          }
+          targetViewId = 'hub';
+        } else if (targetViewId === 'advancemanager' && !window.AuthManager.hasAppAccess('advancemanager')) {
+          if (typeof window.showToast === 'function') {
+            window.showToast('⛔ 访问权限不足：您当前暂无【Advance Manager】的访问授权，请联系 Admin 开通！');
+          }
+          targetViewId = 'hub';
+        } else if (targetViewId === 'admin' && !window.AuthManager.hasAppAccess('admin')) {
+          if (typeof window.showToast === 'function') {
+            window.showToast('⛔ 访问权限不足：您当前暂无【Admin Console】的访问授权，请联系 Admin 开通！');
+          }
+          targetViewId = 'hub';
         }
-        targetViewId = 'hub';
       }
 
       if (!views[targetViewId]) targetViewId = isLoggedIn ? 'hub' : 'login';
@@ -166,6 +178,18 @@
       card.addEventListener('click', () => {
         const targetView = card.getAttribute('data-target-view');
         if (targetView) {
+          if (card.classList.contains('is-locked') || (window.AuthManager && !window.AuthManager.hasAppAccess(targetView))) {
+            const appTitles = {
+              courtledger: 'Court Ledger',
+              advancemanager: 'Advance Manager',
+              admin: 'Admin Console'
+            };
+            const appName = appTitles[targetView] || targetView;
+            if (typeof window.showToast === 'function') {
+              window.showToast(`⛔ 访问权限不足：您当前暂无【${appName}】的访问授权，请联系 Admin 开通！`);
+            }
+            return;
+          }
           switchView(targetView);
         }
       });

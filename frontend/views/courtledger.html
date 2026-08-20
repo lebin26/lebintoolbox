@@ -19,6 +19,26 @@
 
         <!-- Slide 1: Calculator page -->
         <div class="swipe-slide" id="slide-calc">
+
+          <!-- 🏸 3-Step Operation Flow Sequence Bar -->
+          <div class="cl-flow-bar">
+            <div class="flow-step-item active">
+              <span class="step-num">1</span>
+              <span class="step-title">参数测算</span>
+            </div>
+            <span class="flow-divider">➔</span>
+            <div class="flow-step-item" id="flow-step-roster" onclick="CourtLedgerRoster.openRosterModal()" style="cursor:pointer;" title="点击录入/解析接龙名单">
+              <span class="step-num">2</span>
+              <span class="step-title">涉及人员</span>
+              <span id="flow-roster-badge" class="flow-step-badge">未导入</span>
+            </div>
+            <span class="flow-divider">➔</span>
+            <div class="flow-step-item" id="flow-step-generate" onclick="CourtLedgerRoster.generateAndExportBill()" style="cursor:pointer;" title="点击流转至垫付管家独立核销">
+              <span class="step-num">3</span>
+              <span class="step-title">生成独立账单</span>
+            </div>
+          </div>
+
           <!-- Input Fields Section -->
           <section class="inputs-section">
 
@@ -30,6 +50,7 @@
                   <label for="venue-select">选择场地</label>
                   <div class="venue-header-actions">
                     <span id="venue-rate-badge" class="venue-rate-badge">加载中...</span>
+                    <button type="button" id="btn-open-roster-modal" class="btn-roster-quick-btn" title="导入微信/WhatsApp接龙名单并跟踪收款">📋 接龙名单与收款</button>
                     <button type="button" id="btn-manage-venues" class="btn-icon-link" title="数据库球场管理">⚙️ 管理球场</button>
                   </div>
                 </div>
@@ -271,20 +292,25 @@
               </div>
             </div>
 
-            <!-- Bill Action Buttons (Copy, Save, History) -->
-            <div class="bill-actions-row">
-              <button id="copy-bill-btn" class="copy-bill-btn">
-                <span class="btn-icon">📋</span>
-                <span class="btn-text">复制账单</span>
+            <!-- Streamlined Workflow Actions (Pure Calculator -> Standalone Bill Ledger) -->
+            <div class="cl-workflow-actions">
+              <button type="button" id="btn-generate-standalone-bill" class="btn-generate-bill-cta" onclick="CourtLedgerRoster.generateAndExportBill()">
+                <span class="btn-icon">🚀</span>
+                <div class="btn-text-group">
+                  <span class="btn-main-text">生成独立账单并流转</span>
+                  <span class="btn-sub-text">流转至垫付管家 · 复制微信/WhatsApp文案</span>
+                </div>
               </button>
-              <button id="save-bill-btn" class="save-bill-btn">
-                <span class="btn-icon">💾</span>
-                <span class="btn-text">保存账单</span>
-              </button>
-              <button id="history-bill-btn" class="history-bill-btn">
-                <span class="btn-icon">📜</span>
-                <span class="btn-text">历史账单</span>
-              </button>
+              <div class="cl-sub-actions-row">
+                <button type="button" id="btn-open-roster-action" class="btn-sub-action" onclick="CourtLedgerRoster.openRosterModal()">
+                  <span class="btn-icon">👥</span>
+                  <span class="btn-text" id="btn-roster-action-text">接龙与涉及人员</span>
+                </button>
+                <button type="button" id="copy-bill-btn" class="btn-sub-action copy-bill-btn">
+                  <span class="btn-icon">📋</span>
+                  <span class="btn-text">复制分享文案</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -440,6 +466,64 @@
           <button type="button" id="btn-cancel-edit-bill" class="btn-secondary-action">取消</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal 3: Smart Roster Import & Payment Tracking (接龙名单与收款核销看板) -->
+  <div id="court-roster-modal" class="modal-overlay modal-fullscreen hidden">
+    <div class="modal-card modal-roster-card">
+      <div class="modal-header">
+        <div class="roster-header-left">
+          <h3 class="modal-title">🏸 球局接龙名单与收款核销看板</h3>
+          <span class="roster-subtitle">支持微信/WhatsApp 接龙一键解析 (6~25人) · 独立账单核销</span>
+        </div>
+        <button type="button" class="modal-close-btn" id="roster-modal-close">&times;</button>
+      </div>
+
+      <div class="modal-body roster-modal-body">
+        <!-- Section 1: Raw Textarea Import -->
+        <div class="roster-input-box">
+          <div class="roster-input-header">
+            <label for="roster-raw-text">📋 粘贴群接龙名单 (自动提取场地/时段/序号/Host/加人/候补)</label>
+            <button type="button" id="btn-clear-roster-text" class="btn-text-link">清空文本</button>
+          </div>
+          <textarea id="roster-raw-text" class="roster-textarea" placeholder="例如：&#10;📍Lavana Setapak &#10;🗓️15/8/2026 (Saturday) &#10;🕓4pm-6pm &#10;1. Siow&#10;2. Toh&#10;3. nick +1&#10;4. Dickson (Host)..."></textarea>
+          <div class="roster-input-actions">
+            <button type="button" id="btn-parse-roster" class="btn-primary-action">✨ 智能解析并填入计算器</button>
+          </div>
+        </div>
+
+        <!-- Section 2: Payment Progress & Toolbar -->
+        <div class="roster-dashboard-box">
+          <div class="roster-summary-bar">
+            <div class="summary-stat-item">
+              <span class="summary-label">👥 参与人数</span>
+              <span id="roster-player-count-badge" class="summary-val">0 人</span>
+            </div>
+            <div class="summary-stat-item flex-grow">
+              <span class="summary-label">💵 收款进度</span>
+              <span id="roster-paid-stats" class="summary-val">已收 0 / 0 人</span>
+              <div class="roster-progress-track">
+                <div id="roster-progress-fill" class="roster-progress-fill" style="width: 0%;"></div>
+              </div>
+            </div>
+            <div class="summary-actions">
+              <button type="button" id="btn-copy-roster-progress" class="btn-pill-action btn-copy-progress">📋 复制群收款接龙</button>
+              <button type="button" id="btn-roster-mark-all-paid" class="btn-pill-action btn-mark-all">✅ 全员已付</button>
+            </div>
+          </div>
+
+          <!-- Section 3: Player Cards Grid -->
+          <div id="roster-player-list" class="roster-player-grid">
+            <!-- Dynamic player cards -->
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer roster-modal-footer">
+        <button type="button" id="btn-roster-sync-am" class="btn-primary-action btn-sync-am" style="background: linear-gradient(135deg, #10b981, #059669); margin-right: 8px;">🚀 生成独立账单并流转至垫付管家 ➔</button>
+        <button type="button" id="btn-roster-copy-bill" class="btn-secondary-action" onclick="CourtLedgerBill.copyCalculatedBillText()">📋 复制账单文案</button>
+      </div>
     </div>
   </div>
 </div>

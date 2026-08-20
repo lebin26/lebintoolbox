@@ -714,11 +714,23 @@
 
         // Edit all bill parameters
         item.querySelector('.btn-edit-bill').addEventListener('click', () => {
+          if (window.AuthManager && !window.AuthManager.hasActionPermission('courtledger:create_bill')) {
+            if (typeof window.showToast === 'function') {
+              window.showToast('⛔ 权限不足：您当前暂无【修改账单】的权限，请联系 Admin 开通！');
+            }
+            return;
+          }
           openEditBillModal(bill);
         });
 
         // Delete bill
         item.querySelector('.btn-delete-bill').addEventListener('click', async () => {
+          if (window.AuthManager && !window.AuthManager.hasActionPermission('courtledger:delete_bill')) {
+            if (typeof window.showToast === 'function') {
+              window.showToast('⛔ 权限不足：您当前暂无【删除账单】的权限，请联系 Admin 开通！');
+            }
+            return;
+          }
           await window.CourtLedgerState.deleteBill(bill.id);
           renderModalBillsList(billsSearchInput ? billsSearchInput.value : '');
           if (typeof window.showToast === 'function') {

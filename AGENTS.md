@@ -20,6 +20,7 @@ This file governs all AI Agents (including Gemini, ChatGPT, Claude, Cursor, Anti
 12. **Never allow the system to have zero active Admins.** Never allow an Admin to accidentally remove or freeze the sole Admin.
 13. **Important Admin actions must create Audit Logs.** Always record action details in `admin_logs`.
 14. **Do not break existing user functionality when adding Admin functionality.** Admin users must retain 100% of normal user functionality.
+15. **Never seed or generate dummy/fake user data into database.** Do NOT create fake/dummy users in migrations or runtime. Automated unit and E2E tests MUST clean up all temporary test user accounts upon completion, keeping the database 100% clean with only real users.
 
 ---
 

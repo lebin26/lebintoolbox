@@ -1,0 +1,23 @@
+{
+  "agent": {
+    "tools": {
+      "browser": {
+        "enabled": true,
+        "provider": "chrome",
+        "headless": false,
+        "cdpUrl": "http://127.0.0.1:9222",
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    "permissions": {
+      "allow": [
+        "read_url(*)",
+        "execute_url(*)",
+        "capture_screenshot(*)"
+      ]
+    }
+  }
+}

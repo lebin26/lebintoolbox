@@ -65,6 +65,7 @@ window.AMApi = (function () {
     getCategories: () => request('/api/advancemanager/categories'),
     getProjects: () => request('/api/advancemanager/projects'),
     createProject: (payload) => request('/api/advancemanager/projects', { method: 'POST', body: JSON.stringify(payload) }),
+    updateProject: (id, payload) => request(`/api/advancemanager/projects/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
     getProjectDetail: (id) => request(`/api/advancemanager/projects/${id}`),
     cleanupSettledHistory: () => request('/api/advancemanager/cleanup', { method: 'POST' }),
     togglePersonFavourite: (id) => request(`/api/advancemanager/persons/${id}/toggle-favourite`, { method: 'POST' })

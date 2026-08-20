@@ -51,6 +51,71 @@ function parseToken(tokenStr) {
   }
 }
 
+// Action Permission Definitions
+export const ALL_ACTION_PERMISSIONS = [
+  'admin:create_user',
+  'admin:delete_user',
+  'admin:edit_user',
+  'admin:manage_venues',
+  'courtledger:create_bill',
+  'courtledger:delete_bill',
+  'advancemanager:create_expense',
+  'advancemanager:delete_expense',
+  'advancemanager:settle',
+  'advancemanager:manage_people'
+];
+
+export const DEFAULT_USER_PERMISSIONS = [
+  'courtledger:create_bill',
+  'courtledger:delete_bill',
+  'advancemanager:create_expense',
+  'advancemanager:delete_expense',
+  'advancemanager:settle',
+  'advancemanager:manage_people'
+];
+
+// Helper to parse granular app action permissions
+export function parseAppPermissions(raw, role) {
+  if (role === 'admin') return [...ALL_ACTION_PERMISSIONS];
+  let perms = [];
+  try {
+    if (typeof raw === 'string') {
+      perms = JSON.parse(raw);
+    } else if (Array.isArray(raw)) {
+      perms = raw;
+    }
+  } catch (e) {
+    perms = [];
+  }
+  if (!Array.isArray(perms) || perms.length === 0) {
+    perms = role === 'manager' 
+      ? ['admin:create_user', 'admin:edit_user', 'admin:manage_venues', ...DEFAULT_USER_PERMISSIONS]
+      : [...DEFAULT_USER_PERMISSIONS];
+  }
+  return perms;
+}
+
+// Helper to parse allowed_apps JSON and guarantee admin app for managers & admins
+export function parseAllowedApps(allowedAppsRaw, role) {
+  let apps = [];
+  try {
+    if (typeof allowedAppsRaw === 'string') {
+      apps = JSON.parse(allowedAppsRaw);
+    } else if (Array.isArray(allowedAppsRaw)) {
+      apps = allowedAppsRaw;
+    }
+  } catch (e) {
+    apps = [];
+  }
+  if (!Array.isArray(apps) || apps.length === 0) {
+    apps = ['courtledger', 'advancemanager'];
+  }
+  if (role === 'admin' || role === 'manager') {
+    if (!apps.includes('admin')) apps.push('admin');
+  }
+  return apps;
+}
+
 // Auth Middleware: Resolve current logged-in user
 async function getAuthenticatedUser(request, env) {
   const authHeader = request.headers.get('Authorization') || request.headers.get('X-Auth-Token');
@@ -58,17 +123,20 @@ async function getAuthenticatedUser(request, env) {
   if (!payload || !payload.userId) return null;
 
   const user = await env.DB.prepare(
-    'SELECT id, email, name, avatar, role, status, created_at AS createdAt, last_login_at AS lastLoginAt FROM users WHERE id = ?'
+    'SELECT id, email, name, avatar, role, status, allowed_apps AS allowedApps, app_permissions AS appPermissions, created_at AS createdAt, last_login_at AS lastLoginAt FROM users WHERE id = ?'
   ).bind(payload.userId).first();
 
   if (!user || user.status === 'suspended' || user.status === 'deleted') {
     return null;
   }
+
+  user.allowedApps = parseAllowedApps(user.allowedApps, user.role);
+  user.appPermissions = parseAppPermissions(user.appPermissions, user.role);
   return user;
 }
 
-// Admin Authorization Middleware (Guarantees true backend RBAC protection)
-async function requireAdmin(request, env) {
+// Admin Authorization Middleware (Guarantees true backend RBAC protection with Hierarchy)
+async function requireAdmin(request, env, requiredMinRole = 'manager') {
   const authHeader = request.headers.get('Authorization') || request.headers.get('X-Auth-Token');
   const payload = parseToken(authHeader);
   if (!payload || !payload.userId) {
@@ -76,7 +144,7 @@ async function requireAdmin(request, env) {
   }
 
   const user = await env.DB.prepare(
-    'SELECT id, email, name, avatar, role, status FROM users WHERE id = ?'
+    'SELECT id, email, name, avatar, role, status, allowed_apps AS allowedApps, app_permissions AS appPermissions FROM users WHERE id = ?'
   ).bind(payload.userId).first();
 
   if (!user) {
@@ -85,8 +153,16 @@ async function requireAdmin(request, env) {
   if (user.status === 'suspended' || user.status === 'deleted') {
     return { authorized: false, error: '账号已被停用或删除', status: 403 };
   }
-  if (user.role !== 'admin') {
-    return { authorized: false, error: '权限不足：仅系统管理员允许访问 Admin API (403 Forbidden)', status: 403 };
+
+  user.allowedApps = parseAllowedApps(user.allowedApps, user.role);
+  user.appPermissions = parseAppPermissions(user.appPermissions, user.role);
+
+  const roleRanks = { admin: 100, manager: 50, user: 10 };
+  const userRank = roleRanks[user.role] || 0;
+  const minRank = roleRanks[requiredMinRole] || 50;
+
+  if (userRank < minRank) {
+    return { authorized: false, error: '权限不足：仅管理员允许访问管理接口 (403 Forbidden)', status: 403 };
   }
 
   return { authorized: true, user };
@@ -234,11 +310,12 @@ function validateUsername(name) {
         const pwdHash = await hashPassword(password);
 
         const result = await env.DB.prepare(
-          `INSERT INTO users (email, password_hash, plain_password, name, role, status) VALUES (?, ?, ?, ?, 'user', 'active')`
+          `INSERT INTO users (email, password_hash, plain_password, name, role, status, allowed_apps) VALUES (?, ?, ?, ?, 'user', 'active', '["courtledger","advancemanager"]')`
         ).bind(email.trim().toLowerCase(), pwdHash, password, userName).run();
 
         const userId = result.meta.last_row_id;
         const token = generateToken(userId, 'user');
+        const allowedApps = ['courtledger', 'advancemanager'];
 
         return jsonResponse({
           message: '注册成功',
@@ -247,7 +324,8 @@ function validateUsername(name) {
             email: email.trim().toLowerCase(),
             name: userName,
             role: 'user',
-            status: 'active'
+            status: 'active',
+            allowedApps
           },
           token
         }, 201);
@@ -264,7 +342,7 @@ function validateUsername(name) {
         }
 
         const user = await env.DB.prepare(
-          `SELECT id, email, password_hash, name, avatar, role, status FROM users WHERE LOWER(email) = ? OR LOWER(name) = ?`
+          `SELECT id, email, password_hash, name, avatar, role, status, allowed_apps AS allowedApps FROM users WHERE LOWER(email) = ? OR LOWER(name) = ?`
         ).bind(loginId.toLowerCase(), loginId.toLowerCase()).first();
 
         if (!user) {
@@ -287,6 +365,7 @@ function validateUsername(name) {
         await env.DB.prepare('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?').bind(user.id).run();
 
         const token = generateToken(user.id, user.role);
+        const allowedApps = parseAllowedApps(user.allowedApps, user.role);
 
         return jsonResponse({
           message: '登录成功',
@@ -296,7 +375,8 @@ function validateUsername(name) {
             name: user.name,
             avatar: user.avatar,
             role: user.role,
-            status: user.status
+            status: user.status,
+            allowedApps
           },
           token
         });
@@ -379,6 +459,7 @@ function validateUsername(name) {
           const activeUsersRes = await env.DB.prepare('SELECT COUNT(*) AS count FROM users WHERE status = "active"').first();
           const suspendedUsersRes = await env.DB.prepare('SELECT COUNT(*) AS count FROM users WHERE status = "suspended"').first();
           const adminCountRes = await env.DB.prepare('SELECT COUNT(*) AS count FROM users WHERE role = "admin" AND status = "active"').first();
+          const managerCountRes = await env.DB.prepare('SELECT COUNT(*) AS count FROM users WHERE role = "manager" AND status = "active"').first();
           const totalBillsRes = await env.DB.prepare('SELECT COUNT(*) AS count FROM bills').first();
           const totalProfitRes = await env.DB.prepare('SELECT SUM(net_profit) AS sumProfit FROM bills').first();
 
@@ -388,9 +469,172 @@ function validateUsername(name) {
               activeUsers: activeUsersRes?.count || 0,
               suspendedUsers: suspendedUsersRes?.count || 0,
               adminUsers: adminCountRes?.count || 0,
+              managerUsers: managerCountRes?.count || 0,
+              totalManagement: (adminCountRes?.count || 0) + (managerCountRes?.count || 0),
               totalBills: totalBillsRes?.count || 0,
               totalProfit: parseFloat(totalProfitRes?.sumProfit || 0)
             }
+          });
+        }
+
+        // POST /api/admin/users - Direct Create New User by Admin / Manager
+        if (method === 'POST' && path === '/api/admin/users') {
+          // Action Permission Check
+          if (adminUser.role !== 'admin' && (!Array.isArray(adminUser.appPermissions) || !adminUser.appPermissions.includes('admin:create_user'))) {
+            return errorResponse('⛔ 权限不足：您当前暂无【创建用户】的权限，请联系 Admin 开通！', 403);
+          }
+
+          const body = await request.json().catch(() => null);
+          if (!body) return errorResponse('无效请求体', 400);
+
+          const { name, email, password, role = 'user', status = 'active', allowedApps, appPermissions } = body;
+
+          if (!name || !email || !password) {
+            return errorResponse('请完整填写用户名、电子邮箱和密码', 400);
+          }
+
+          const nameCheck = validateUsername(name);
+          if (!nameCheck.valid) return errorResponse(nameCheck.error, 400);
+          const cleanName = nameCheck.name;
+
+          const cleanEmail = email.trim().toLowerCase();
+          if (!cleanEmail || !cleanEmail.includes('@')) {
+            return errorResponse('请输入有效的电子邮箱地址', 400);
+          }
+
+          if (password.length < 6) {
+            return errorResponse('初始密码长度不得少于 6 位', 400);
+          }
+
+          const targetRole = (role || 'user').toLowerCase();
+          if (!['admin', 'manager', 'user'].includes(targetRole)) {
+            return errorResponse('无效的角色权限类型', 400);
+          }
+
+          // RBAC Hierarchy Check: Manager cannot create Admin or Manager
+          if (adminUser.role === 'manager' && targetRole !== 'user') {
+            return errorResponse('权限不足拒绝：二级管理员(Manager)只能创建普通用户，无权分配管理层权限！', 403);
+          }
+
+          const existingEmail = await env.DB.prepare('SELECT id FROM users WHERE LOWER(email) = ?').bind(cleanEmail).first();
+          if (existingEmail) return errorResponse('该电子邮箱已被注册，请使用其他邮箱', 400);
+
+          const existingName = await env.DB.prepare('SELECT id FROM users WHERE LOWER(name) = ?').bind(cleanName.toLowerCase()).first();
+          if (existingName) return errorResponse('该用户名已被占用，请换一个用户名', 400);
+
+          const targetStatus = status === 'suspended' ? 'suspended' : 'active';
+          const pwdHash = await hashPassword(password);
+
+          let finalApps = parseAllowedApps(allowedApps, targetRole);
+          let finalPerms = parseAppPermissions(appPermissions, targetRole);
+          if (adminUser.role === 'manager') {
+            finalApps = finalApps.filter(a => a !== 'admin');
+            finalPerms = finalPerms.filter(p => !p.startsWith('admin:'));
+          }
+
+          const insertRes = await env.DB.prepare(
+            `INSERT INTO users (name, email, password_hash, plain_password, role, status, allowed_apps, app_permissions, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+          ).bind(cleanName, cleanEmail, pwdHash, password, targetRole, targetStatus, JSON.stringify(finalApps), JSON.stringify(finalPerms)).run();
+
+          const newUserId = insertRes.meta?.last_row_id;
+
+          // Audit Log
+          await createAdminLog(env, adminUser.id, adminUser.name, 'CREATE_USER', 'user', newUserId, {
+            name: cleanName,
+            email: cleanEmail,
+            role: targetRole,
+            status: targetStatus,
+            allowedApps: finalApps,
+            appPermissions: finalPerms,
+            createdBy: adminUser.name,
+            creatorRole: adminUser.role
+          });
+
+          return jsonResponse({
+            message: `用户 ${cleanName} (${targetRole}) 已成功创建`,
+            user: {
+              id: newUserId,
+              name: cleanName,
+              email: cleanEmail,
+              role: targetRole,
+              status: targetStatus,
+              allowedApps: finalApps,
+              appPermissions: finalPerms
+            }
+          });
+        }
+
+        // GET /api/admin/app-access-stats - Detailed Sub-App User Authorization Metrics
+        if (method === 'GET' && path === '/api/admin/app-access-stats') {
+          const allUsersRes = await env.DB.prepare(
+            'SELECT id, name, email, role, status, allowed_apps AS allowedApps, created_at AS createdAt, last_login_at AS lastLoginAt FROM users WHERE status != "deleted" ORDER BY id ASC'
+          ).all();
+          const allUsers = allUsersRes.results || [];
+
+          const appDefinitions = [
+            {
+              id: 'courtledger',
+              name: '🏸 Court Ledger',
+              subtitle: '羽球账单与多场次分摊计算器',
+              desc: '支持分段计费、用球耗损、Host免单平摊与一键账单生成'
+            },
+            {
+              id: 'advancemanager',
+              name: '🌴 Advance Manager',
+              subtitle: '活动归集与垫付结算管理',
+              desc: '支持多币种垫付、群出游债务简化对冲、好友往来账与羽球沙盒归档'
+            },
+            {
+              id: 'admin',
+              name: '⚙️ Admin Console',
+              subtitle: '系统管理与用户权限控制台',
+              desc: '支持全站用户管理、RBAC权限分配、App授权控制及系统审计流水'
+            }
+          ];
+
+          const totalUsers = allUsers.length;
+          const activeUsers = allUsers.filter(u => u.status === 'active').length;
+
+          const appStats = appDefinitions.map(app => {
+            const accessibleUsers = allUsers.filter(u => {
+              const allowed = parseAllowedApps(u.allowedApps, u.role);
+              return allowed.includes(app.id);
+            });
+
+            const activeAccessibleUsers = accessibleUsers.filter(u => u.status === 'active');
+            const coveragePercent = activeUsers > 0 ? Math.round((activeAccessibleUsers.length / activeUsers) * 100) : 0;
+
+            return {
+              ...app,
+              totalAccessibleCount: accessibleUsers.length,
+              activeAccessibleCount: activeAccessibleUsers.length,
+              coveragePercent,
+              users: accessibleUsers.map(u => ({
+                id: u.id,
+                name: u.name,
+                email: u.email,
+                role: u.role,
+                status: u.status
+              }))
+            };
+          });
+
+          const fullAccessUsers = allUsers.filter(u => {
+            const allowed = parseAllowedApps(u.allowedApps, u.role);
+            return ['courtledger', 'advancemanager', 'admin'].every(k => allowed.includes(k));
+          }).length;
+
+          const restrictedUsers = totalUsers - fullAccessUsers;
+
+          return jsonResponse({
+            summary: {
+              totalUsers,
+              activeUsers,
+              fullAccessUsers,
+              restrictedUsers
+            },
+            apps: appStats
           });
         }
 
@@ -400,7 +644,7 @@ function validateUsername(name) {
           const roleFilter = url.searchParams.get('role') || 'all';
           const statusFilter = url.searchParams.get('status') || 'all';
 
-          let query = 'SELECT id, email, name, avatar, role, status, plain_password AS plainPassword, created_at AS createdAt, last_login_at AS lastLoginAt FROM users WHERE status != "deleted"';
+          let query = 'SELECT id, email, name, avatar, role, status, allowed_apps AS allowedApps, app_permissions AS appPermissions, plain_password AS plainPassword, created_at AS createdAt, last_login_at AS lastLoginAt FROM users WHERE status != "deleted"';
           const params = [];
 
           if (search) {
@@ -421,7 +665,13 @@ function validateUsername(name) {
           const stmt = env.DB.prepare(query);
           const { results } = params.length > 0 ? await stmt.bind(...params).all() : await stmt.all();
 
-          return jsonResponse({ users: results || [] });
+          const formattedUsers = (results || []).map(u => ({
+            ...u,
+            allowedApps: parseAllowedApps(u.allowedApps, u.role),
+            appPermissions: parseAppPermissions(u.appPermissions, u.role)
+          }));
+
+          return jsonResponse({ users: formattedUsers });
         }
 
         // GET /api/admin/users/:id - Get detail of a specific user
@@ -429,13 +679,15 @@ function validateUsername(name) {
         if (method === 'GET' && getUserMatch) {
           const targetId = parseInt(getUserMatch[1]);
           const targetUser = await env.DB.prepare(
-            'SELECT id, email, name, avatar, role, status, plain_password AS plainPassword, created_at AS createdAt, last_login_at AS lastLoginAt FROM users WHERE id = ?'
+            'SELECT id, email, name, avatar, role, status, allowed_apps AS allowedApps, app_permissions AS appPermissions, plain_password AS plainPassword, created_at AS createdAt, last_login_at AS lastLoginAt FROM users WHERE id = ?'
           ).bind(targetId).first();
 
           if (!targetUser) {
             return errorResponse('未找到指定用户', 404);
           }
 
+          targetUser.allowedApps = parseAllowedApps(targetUser.allowedApps, targetUser.role);
+          targetUser.appPermissions = parseAppPermissions(targetUser.appPermissions, targetUser.role);
           return jsonResponse({ user: targetUser });
         }
 
@@ -467,18 +719,36 @@ function validateUsername(name) {
           });
         }
 
-        // PATCH /api/admin/users/:id - Update User Role / Status / Info
+        // PATCH /api/admin/users/:id - Update User Role / Status / Info / Allowed Apps / Action Permissions
         const patchUserMatch = path.match(/^\/api\/admin\/users\/(\d+)$/);
         if (method === 'PATCH' && patchUserMatch) {
+          // Action Permission Check
+          if (adminUser.role !== 'admin' && (!Array.isArray(adminUser.appPermissions) || !adminUser.appPermissions.includes('admin:edit_user'))) {
+            return errorResponse('⛔ 权限不足：您当前暂无【编辑用户】的权限，请联系 Admin 开通！', 403);
+          }
+
           const targetId = parseInt(patchUserMatch[1]);
           const body = await request.json();
-          const { name, email, role, status, password } = body;
+          const { name, email, role, status, password, allowedApps, appPermissions } = body;
 
-          const targetUser = await env.DB.prepare('SELECT id, email, name, role, status FROM users WHERE id = ?').bind(targetId).first();
+          const targetUser = await env.DB.prepare('SELECT id, email, name, role, status, allowed_apps AS allowedApps, app_permissions AS appPermissions FROM users WHERE id = ?').bind(targetId).first();
           if (!targetUser) return errorResponse('未找到指定用户', 404);
 
-          // Admin Safeguard Rule 8: Prevent demoting/suspending the last active admin!
-          if (targetUser.role === 'admin' && (role === 'user' || status === 'suspended' || status === 'deleted')) {
+          // RBAC Hierarchy Check: Manager cannot edit Admin or another Manager
+          if (adminUser.role === 'manager') {
+            if (targetUser.role === 'admin') {
+              return errorResponse('权限不足拒绝：二级管理员(Manager)无权修改超级管理员(Admin)账号！', 403);
+            }
+            if (targetUser.role === 'manager' && targetId !== adminUser.id) {
+              return errorResponse('权限不足拒绝：二级管理员(Manager)无权修改其他管理员账号！', 403);
+            }
+            if (role !== undefined && role !== targetUser.role && role !== 'user') {
+              return errorResponse('权限不足拒绝：二级管理员(Manager)无权调整或提升用户角色等级！', 403);
+            }
+          }
+
+          // Admin Safeguard: Prevent demoting/suspending the last active admin!
+          if (targetUser.role === 'admin' && (role === 'user' || role === 'manager' || status === 'suspended' || status === 'deleted')) {
             const adminCountRes = await env.DB.prepare('SELECT COUNT(*) AS count FROM users WHERE role = "admin" AND status = "active" AND id != ?').bind(targetId).first();
             if ((adminCountRes?.count || 0) === 0) {
               return errorResponse('安全限制拒绝：系统必须保留至少一名活跃管理员，无法修改或冻结唯一 Admin！', 400);
@@ -508,15 +778,33 @@ function validateUsername(name) {
           const newRole = role !== undefined ? role : targetUser.role;
           const newStatus = status !== undefined ? status : targetUser.status;
 
+          let newAllowedApps = targetUser.allowedApps;
+          if (allowedApps !== undefined) {
+            let parsed = parseAllowedApps(allowedApps, newRole);
+            if (adminUser.role === 'manager') {
+              parsed = parsed.filter(a => a !== 'admin');
+            }
+            newAllowedApps = JSON.stringify(parsed);
+          }
+
+          let newAppPermissions = targetUser.appPermissions;
+          if (appPermissions !== undefined) {
+            let parsedPerms = parseAppPermissions(appPermissions, newRole);
+            if (adminUser.role === 'manager') {
+              parsedPerms = parsedPerms.filter(p => !p.startsWith('admin:'));
+            }
+            newAppPermissions = JSON.stringify(parsedPerms);
+          }
+
           if (password && password.length >= 6) {
             const pwdHash = await hashPassword(password);
             await env.DB.prepare(
-              'UPDATE users SET name = ?, email = ?, role = ?, status = ?, password_hash = ?, plain_password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-            ).bind(newName, newEmail, newRole, newStatus, pwdHash, password, targetId).run();
+              'UPDATE users SET name = ?, email = ?, role = ?, status = ?, allowed_apps = ?, app_permissions = ?, password_hash = ?, plain_password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+            ).bind(newName, newEmail, newRole, newStatus, newAllowedApps, newAppPermissions, pwdHash, password, targetId).run();
           } else {
             await env.DB.prepare(
-              'UPDATE users SET name = ?, email = ?, role = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-            ).bind(newName, newEmail, newRole, newStatus, targetId).run();
+              'UPDATE users SET name = ?, email = ?, role = ?, status = ?, allowed_apps = ?, app_permissions = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+            ).bind(newName, newEmail, newRole, newStatus, newAllowedApps, newAppPermissions, targetId).run();
           }
 
           // Audit Log
@@ -529,6 +817,8 @@ function validateUsername(name) {
             newRole,
             previousStatus: targetUser.status,
             newStatus,
+            allowedApps: newAllowedApps,
+            appPermissions: newAppPermissions,
             passwordChanged: !!(password && password.length >= 6)
           });
 
@@ -541,6 +831,11 @@ function validateUsername(name) {
           const targetId = parseInt(suspendMatch[1]);
           const targetUser = await env.DB.prepare('SELECT id, name, role FROM users WHERE id = ?').bind(targetId).first();
           if (!targetUser) return errorResponse('未找到指定用户', 404);
+
+          // RBAC Hierarchy Check: Manager cannot suspend Admin or Manager
+          if (adminUser.role === 'manager' && (targetUser.role === 'admin' || targetUser.role === 'manager')) {
+            return errorResponse('权限不足拒绝：二级管理员(Manager)无权冻结管理层账号！', 403);
+          }
 
           if (targetUser.role === 'admin') {
             const adminCountRes = await env.DB.prepare('SELECT COUNT(*) AS count FROM users WHERE role = "admin" AND status = "active" AND id != ?').bind(targetId).first();
@@ -559,8 +854,13 @@ function validateUsername(name) {
         const activateMatch = path.match(/^\/api\/admin\/users\/(\d+)\/activate$/);
         if (method === 'POST' && activateMatch) {
           const targetId = parseInt(activateMatch[1]);
-          const targetUser = await env.DB.prepare('SELECT id, name FROM users WHERE id = ?').bind(targetId).first();
+          const targetUser = await env.DB.prepare('SELECT id, name, role FROM users WHERE id = ?').bind(targetId).first();
           if (!targetUser) return errorResponse('未找到指定用户', 404);
+
+          // RBAC Hierarchy Check: Manager cannot activate Admin or Manager
+          if (adminUser.role === 'manager' && (targetUser.role === 'admin' || targetUser.role === 'manager')) {
+            return errorResponse('权限不足拒绝：二级管理员(Manager)无权操作管理层账号！', 403);
+          }
 
           await env.DB.prepare('UPDATE users SET status = "active", updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(targetId).run();
           await createAdminLog(env, adminUser.id, adminUser.name, 'ACTIVATE_USER', 'user', targetId, `解冻激活了用户 ${targetUser.name} (${targetId})`);
@@ -571,12 +871,22 @@ function validateUsername(name) {
         // DELETE /api/admin/users/:id - Delete User Permanently
         const deleteUserMatch = path.match(/^\/api\/admin\/users\/(\d+)$/);
         if (method === 'DELETE' && deleteUserMatch) {
+          // Action Permission Check
+          if (adminUser.role !== 'admin' && (!Array.isArray(adminUser.appPermissions) || !adminUser.appPermissions.includes('admin:delete_user'))) {
+            return errorResponse('⛔ 权限不足：您当前暂无【删除用户】的权限，请联系 Admin 开通！', 403);
+          }
+
           const targetId = parseInt(deleteUserMatch[1]);
           const targetUser = await env.DB.prepare('SELECT id, name, email, role FROM users WHERE id = ?').bind(targetId).first();
           if (!targetUser) return errorResponse('未找到指定用户', 404);
 
           if (targetId === adminUser.id) {
             return errorResponse('安全限制拒绝：不能删除当前正在操作的管理员账号！', 400);
+          }
+
+          // RBAC Hierarchy Check: Manager cannot delete Admin or Manager
+          if (adminUser.role === 'manager' && (targetUser.role === 'admin' || targetUser.role === 'manager')) {
+            return errorResponse('权限不足拒绝：二级管理员(Manager)无权删除管理层账号！', 403);
           }
 
           if (targetUser.role === 'admin') {
@@ -620,6 +930,13 @@ function validateUsername(name) {
 
       // POST /api/venues - Add new venue to D1
       if (method === 'POST' && path === '/api/venues') {
+        const adminAuth = await requireAdmin(request, env, 'manager');
+        if (adminAuth.authorized) {
+          if (adminAuth.user.role !== 'admin' && (!Array.isArray(adminAuth.user.appPermissions) || !adminAuth.user.appPermissions.includes('admin:manage_venues'))) {
+            return errorResponse('⛔ 权限不足：您当前暂无【管理球场数据】的权限，请联系 Admin 开通！', 403);
+          }
+        }
+
         const body = await request.json();
         const { name, rateMorning, rateEvening } = body;
 
@@ -652,6 +969,13 @@ function validateUsername(name) {
       // PUT /api/venues/:id - Update venue in D1
       const putMatch = path.match(/^\/api\/venues\/(\d+)$/);
       if (method === 'PUT' && putMatch) {
+        const adminAuth = await requireAdmin(request, env, 'manager');
+        if (adminAuth.authorized) {
+          if (adminAuth.user.role !== 'admin' && (!Array.isArray(adminAuth.user.appPermissions) || !adminAuth.user.appPermissions.includes('admin:manage_venues'))) {
+            return errorResponse('⛔ 权限不足：您当前暂无【管理球场数据】的权限，请联系 Admin 开通！', 403);
+          }
+        }
+
         const id = parseInt(putMatch[1]);
         const body = await request.json();
         const { name, rateMorning, rateEvening } = body;
@@ -684,6 +1008,13 @@ function validateUsername(name) {
       // DELETE /api/venues/:id - Delete venue from D1
       const deleteMatch = path.match(/^\/api\/venues\/(\d+)$/);
       if (method === 'DELETE' && deleteMatch) {
+        const adminAuth = await requireAdmin(request, env, 'manager');
+        if (adminAuth.authorized) {
+          if (adminAuth.user.role !== 'admin' && (!Array.isArray(adminAuth.user.appPermissions) || !adminAuth.user.appPermissions.includes('admin:manage_venues'))) {
+            return errorResponse('⛔ 权限不足：您当前暂无【管理球场数据】的权限，请联系 Admin 开通！', 403);
+          }
+        }
+
         const id = parseInt(deleteMatch[1]);
         const result = await env.DB.prepare('DELETE FROM venues WHERE id = ?').bind(id).run();
 
@@ -697,6 +1028,13 @@ function validateUsername(name) {
       // GET /api/bills - Fetch saved bills from D1 (Account Isolated)
       if (method === 'GET' && path === '/api/bills') {
         const currentUser = await getAuthenticatedUser(request, env);
+        if (currentUser && currentUser.role !== 'admin') {
+          const allowed = parseAllowedApps(currentUser.allowedApps, currentUser.role);
+          if (!allowed.includes('courtledger')) {
+            return errorResponse('权限受限：您当前暂未获得【Court Ledger】的访问授权，请联系系统管理员开通！', 403);
+          }
+        }
+
         const scope = url.searchParams.get('scope');
 
         let results;
@@ -735,6 +1073,16 @@ function validateUsername(name) {
       // POST /api/bills - Save new bill to D1 (Bound to Authenticated User)
       if (method === 'POST' && path === '/api/bills') {
         const currentUser = await getAuthenticatedUser(request, env);
+        if (currentUser && currentUser.role !== 'admin') {
+          const allowed = parseAllowedApps(currentUser.allowedApps, currentUser.role);
+          if (!allowed.includes('courtledger')) {
+            return errorResponse('权限受限：您当前暂未获得【Court Ledger】的访问授权，请联系系统管理员开通！', 403);
+          }
+          if (!Array.isArray(currentUser.appPermissions) || !currentUser.appPermissions.includes('courtledger:create_bill')) {
+            return errorResponse('⛔ 权限不足：您当前暂无【创建羽球账单】的权限，请联系 Admin 开通！', 403);
+          }
+        }
+
         const body = await request.json();
         const {
           title, venueName, startTime, duration, courtCount, courtFee,
@@ -780,6 +1128,12 @@ function validateUsername(name) {
       if (method === 'PUT' && putBillMatch) {
         const id = parseInt(putBillMatch[1]);
         const currentUser = await getAuthenticatedUser(request, env);
+        if (currentUser && currentUser.role !== 'admin') {
+          if (!Array.isArray(currentUser.appPermissions) || !currentUser.appPermissions.includes('courtledger:create_bill')) {
+            return errorResponse('⛔ 权限不足：您当前暂无【修改羽球账单】的权限，请联系 Admin 开通！', 403);
+          }
+        }
+
         const body = await request.json();
         const {
           title, venueName, startTime, duration, courtCount, courtFee,
@@ -796,7 +1150,7 @@ function validateUsername(name) {
               player_fee = ?, total_cost = ?, total_revenue = ?, net_profit = ?, updated_at = CURRENT_TIMESTAMP
              WHERE id = ?`
           ).bind(
-            title ? String(title).trim() : '已修改账单',
+            title ? String(title).trim() : '未命名账单',
             venueName ? String(venueName).trim() : '默认场地',
             parseInt(startTime) || 16, parseInt(duration) || 2, parseInt(courtCount) || 1, parseFloat(courtFee) || 0.0,
             parseInt(totalPlayers) || 6, parseInt(hostCount) || 0, parseInt(shuttlesUsed) || 3, parseFloat(shuttlePrice) || 0.0,
@@ -812,7 +1166,7 @@ function validateUsername(name) {
               player_fee = ?, total_cost = ?, total_revenue = ?, net_profit = ?, updated_at = CURRENT_TIMESTAMP
              WHERE id = ? AND user_id = ?`
           ).bind(
-            title ? String(title).trim() : '已修改账单',
+            title ? String(title).trim() : '未命名账单',
             venueName ? String(venueName).trim() : '默认场地',
             parseInt(startTime) || 16, parseInt(duration) || 2, parseInt(courtCount) || 1, parseFloat(courtFee) || 0.0,
             parseInt(totalPlayers) || 6, parseInt(hostCount) || 0, parseInt(shuttlesUsed) || 3, parseFloat(shuttlePrice) || 0.0,
@@ -836,6 +1190,11 @@ function validateUsername(name) {
       if (method === 'DELETE' && deleteBillMatch) {
         const id = parseInt(deleteBillMatch[1]);
         const currentUser = await getAuthenticatedUser(request, env);
+        if (currentUser && currentUser.role !== 'admin') {
+          if (!Array.isArray(currentUser.appPermissions) || !currentUser.appPermissions.includes('courtledger:delete_bill')) {
+            return errorResponse('⛔ 权限不足：您当前暂无【删除账单】的权限，请联系 Admin 开通！', 403);
+          }
+        }
 
         let result;
         if (currentUser && currentUser.role === 'admin') {

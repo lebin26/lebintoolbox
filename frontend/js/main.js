@@ -267,9 +267,10 @@ function bindUserProfileControls() {
     if (confirmPwdEl) confirmPwdEl.value = '';
     if (roleBadgeEl) {
       const isAdm = user.role === 'admin';
+      const isMgr = user.role === 'manager';
       roleBadgeEl.innerHTML = `
-        <span style="font-weight:600; color:${isAdm ? 'var(--accent)' : 'var(--text-primary)'};">
-          ${isAdm ? '👑 管理员 (Administrator)' : '👤 普通用户 (Standard User)'}
+        <span style="font-weight:600; color:${isAdm ? 'var(--accent)' : isMgr ? '#8b5cf6' : 'var(--text-primary)'};">
+          ${isAdm ? '👑 超级管理员 (Super Admin)' : isMgr ? '🛡️ 二级管理员 (Manager)' : '👤 普通用户 (Standard User)'}
         </span>
         <span style="color:var(--text-muted); margin-left:8px; font-size:0.75rem;">状态: 🟢 正常</span>
       `;

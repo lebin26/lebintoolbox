@@ -79,8 +79,9 @@ users
 ├── plain_password (TEXT, NULLABLE) -- Plaintext password visible only to Administrator for support
 ├── name (TEXT, NOT NULL)
 ├── avatar (TEXT, NULLABLE)
-├── role (TEXT, DEFAULT 'user') -- 'user' | 'admin'
+├── role (TEXT, DEFAULT 'user') -- 'user' | 'manager' | 'admin'
 ├── status (TEXT, DEFAULT 'active') -- 'active' | 'suspended' | 'deleted'
+├── allowed_apps (TEXT, DEFAULT '["courtledger","advancemanager"]') -- JSON Array of permitted sub-apps
 ├── created_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
 ├── updated_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
 └── last_login_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
