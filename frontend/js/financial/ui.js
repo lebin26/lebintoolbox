@@ -1255,6 +1255,20 @@
     }
   }
 
+  async function handleSyncToCloud() {
+    try {
+      showToast('⏳ 正在将本地全部数据同步至云端 D1 数据库...');
+      const res = await window.FinancialAPI.syncLocalToCloud();
+      showToast('🎉 ' + (res.message || '本地全部数据已成功同步至云端！'));
+      const modal = document.getElementById('fin-backup-modal');
+      if (modal) modal.classList.add('hidden');
+      document.body.classList.remove('modal-open');
+      await refreshCurrentTab();
+    } catch (err) {
+      showToast(`❌ 同步失败: ${err.message}`);
+    }
+  }
+
   // -------------------------------------------------------------
   // 8. MODAL EVENT BINDINGS
   // -------------------------------------------------------------
@@ -1540,6 +1554,7 @@
     jumpToMonth,
     openBackupModal,
     handleBackupFileUpload,
+    handleSyncToCloud,
     togglePlatformGroup,
     bindModals,
     openTemplateMarketModal,

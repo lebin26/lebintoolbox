@@ -857,6 +857,14 @@
       'Accept': 'application/json'
     };
 
+    // Auto-inject Auth Token
+    const token = (window.Auth && typeof window.Auth.getToken === 'function')
+      ? window.Auth.getToken()
+      : (localStorage.getItem('omnibox_token') || sessionStorage.getItem('omnibox_token') || '');
+    if (token) {
+      defaultHeaders['Authorization'] = `Bearer ${token}`;
+    }
+
     const config = {
       ...options,
       headers: {
@@ -867,7 +875,7 @@
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1200); // 1.2s max timeout
+      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s max timeout
       config.signal = controller.signal;
 
       const res = await fetch(url, config);
@@ -915,19 +923,8 @@
         const localList = getLocalPlatforms();
         if (remote.platforms.length === 0 && localList.length > 0) {
           console.log('[FinancialAPI] Auto-syncing local offline platforms to cloud user account...');
-          const localProducts = getLocalProducts();
-          const localSnapshots = getLocalSnapshots();
-          const localPeriods = getLocalPeriods();
           try {
-            await request('/api/financial/backup/import', {
-              method: 'POST',
-              body: JSON.stringify({
-                platforms: localList,
-                products: localProducts,
-                periods: localPeriods,
-                snapshots: localSnapshots
-              })
-            });
+            await this.syncLocalToCloud();
             const refreshed = await request('/api/financial/platforms');
             if (refreshed && Array.isArray(refreshed.platforms) && refreshed.platforms.length > 0) {
               return refreshed;
@@ -939,6 +936,60 @@
         return remote;
       }
       return LocalStorageEngine.getPlatforms();
+    },
+
+    // Sync LocalStorage State to Cloud Account
+    async syncLocalToCloud() {
+      const localPlatforms = getLocalPlatforms();
+      const localProducts = getLocalProducts();
+      const localPeriods = getLocalPeriods();
+      const localSnapshots = getLocalSnapshots();
+
+      const payload = {
+        platforms: localPlatforms.map(p => ({
+          id: p.id,
+          name: p.name,
+          logo_url: p.logoUrl || null,
+          description: p.description || null,
+          is_active: p.isActive !== undefined ? p.isActive : 1,
+          sort_order: p.sortOrder || 0
+        })),
+        products: localProducts.map(pr => ({
+          id: pr.id,
+          platform_id: pr.platformId,
+          name: pr.name,
+          product_type: pr.productType || 'Savings',
+          currency: pr.currency || 'MYR',
+          logo_url: pr.logoUrl || null,
+          target_allocation_pct: pr.targetAllocationPct || 0.0,
+          is_active: pr.isActive !== undefined ? pr.isActive : 1,
+          sort_order: pr.sortOrder || 0,
+          notes: pr.notes || null
+        })),
+        periods: localPeriods.map(pe => ({
+          id: pe.id,
+          month_key: pe.monthKey,
+          status: pe.status || 'open',
+          notes: pe.notes || null
+        })),
+        snapshots: localSnapshots.map(s => ({
+          id: s.id,
+          period_id: s.periodId || s.monthKey,
+          month_key: s.monthKey,
+          product_id: s.productId,
+          native_amount: s.nativeAmount !== undefined ? s.nativeAmount : (s.baseAmount || 0),
+          base_amount: s.baseAmount !== undefined ? s.baseAmount : (s.nativeAmount || 0),
+          fx_rate: s.fxRate || 1.0,
+          notes: s.notes || null
+        }))
+      };
+
+      const res = await request('/api/financial/backup/import', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      return res || { message: '本地数据已同步至云端！' };
     },
 
     async createPlatform(data) {
