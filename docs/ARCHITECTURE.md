@@ -1,11 +1,11 @@
 # OmniBox Architecture Documentation (`docs/ARCHITECTURE.md`)
 
 ## 1. Project Overview & Positioning
-**OmniBox** is a modular, multi-app productivity platform designed to host various utility applications with a unified authentication, theme, and full-screen window management system.
+**OmniBox** is a lightweight, zero-build, modular multi-app productivity platform designed to host utility tools with instant access, responsive dark/light theme support, and offline-first data resilience.
 
-- **Platform Container**: **OmniBox**
-- **Flagship Application**: **Court Ledger** (🏸 Badminton Activity AA Bill & Venue Cost Calculator)
-- **Project Structure & App Expansion Guide**: See [`docs/PROJECT_TREE.md`](PROJECT_TREE.md).
+- **Platform Container**: **OmniBox Hub**
+- **Sub-App #1**: **Court Ledger** (🏸 羽毛球活动 AA 场费测算、用球平摊、球场数据管理与历史账单)
+- **Sub-App #2**: **Financial Overview** (💰 月度财务总览、资产配置、多币种换算与跨月走势对比矩阵)
 
 ---
 
@@ -13,100 +13,47 @@
 
 | Tier | Technology / Service | Role & Responsibility |
 | :--- | :--- | :--- |
-| **Frontend** | Vanilla HTML5, Vanilla CSS, ES6 JS (Modules), Vite | User Interface, local dev server with HMR, client-side calculation & state management |
-| **API Layer** | Cloudflare Worker | Serverless API routing, CORS handling, data validation |
-| **Database** | Cloudflare D1 (SQLite Engine) | Serverless relational DB storing users, audit logs, and app-specific data (venues, bills) |
-| **Hosting (FE)** | GitHub Pages / Cloudflare Pages | Static web hosting for frontend application |
-| **Hosting (API)** | Cloudflare Workers Edge Network | Global low-latency API execution |
-| **Build & Deploy** | Cloudflare Workers Builds + GitHub Pages CI | Automated GitHub `push` deployment |
+| **Frontend** | Vanilla HTML5, Vanilla CSS, ES6 Modules | Zero-build single-page web app, DOM state controllers, Canvas charts |
+| **API Layer** | Cloudflare Worker (`worker/src/index.js`, `financial.js`) | Serverless API routing, CORS handling, D1 database execution, and Workers Assets static hosting |
+| **Database** | Cloudflare D1 (SQLite Engine) | Serverless relational DB storing venues, bills, platforms, products, and monthly snapshots |
+| **Hosting** | Cloudflare Workers Assets / Pages | Global edge static file and API serving |
 
 ---
 
 ## 3. Data Flow Architecture
 
 ```text
-+-----------------------+
-|   Frontend User UI    |
-| (GitHub Pages / Vite) |
-+-----------+-----------+
-            |
-     HTTP Fetch Request (/api/...)
-            |
-            v
-+-----------------------+
-|   Cloudflare Worker   |
-|   (worker/src/index.js)
-+-----------+-----------+
-            |
-      env.DB (D1 SQL)
-            |
-            v
-+-----------------------+
-|    Cloudflare D1      |
-|  (SQLite SQL Database)|
-+-----------------------+
++-----------------------------------+
+|         Frontend User UI          |
+| (Vanilla JS + LocalStorage Hybrid)|
++-----------------+-----------------+
+                  |
+        HTTP Fetch Request (/api/...)
+                  |
+                  v
++-----------------------------------+
+|         Cloudflare Worker         |
+|       (worker/src/index.js)       |
++-----------------+-----------------+
+                  |
+             env.DB (D1)
+                  |
+                  v
++-----------------------------------+
+|           Cloudflare D1           |
+|        (SQLite SQL Engine)        |
++-----------------------------------+
 ```
 
 ### Local Development Flow:
-- Frontend running at `http://localhost:8000` via `vite`.
-- Vite proxies `/api/*` to `http://127.0.0.1:8787` (Wrangler local worker).
-- Worker executes against local isolated SQLite database inside `.wrangler/state/v3/d1/`.
-
-### Production Deployment Flow:
-- Frontend hosted at GitHub Pages (or custom domain).
-- Frontend queries Cloudflare Worker API at `https://omnibox-worker.<subdomain>.workers.dev/api/...`.
-- Worker executes queries on Cloudflare D1 Remote Database (`host-calculator-db`).
+- Run `npm run dev` (starts `wrangler dev` inside `worker/`).
+- Serves both frontend static assets and `/api/*` on `http://127.0.0.1:8787` seamlessly without CORS or proxy friction.
 
 ---
 
-## 4. Authentication & Authorization (Unified User & Admin RBAC)
-
-- **Single Account Architecture**: All users across all OmniBox apps share one unified account system (`users` table).
-- **Role Control**:
-  - `role = 'user'`: Accesses normal apps (Hub, CourtLedger, HistoryBills).
-  - `role = 'admin'`: Accesses 100% of normal user features **plus** `/admin` Admin Dashboard (`#view-admin`).
-- **Backend Enforcement**: Cloudflare Worker performs strict token authentication (`/api/auth/*`) and server-side RBAC authorization (`requireAdmin` middleware) returning `403 Forbidden` for unauthorized requests to `/api/admin/*`.
-- **Audit Logs**: All admin actions (role changes, user suspensions, activations) are logged to `admin_logs`.
-- **Sole Admin Safeguard**: System enforces `COUNT(active_admins) > 1` to prevent accidental removal or suspension of the sole active administrator.
-
----
-
-## 5. Environment & Database Isolation
+## 4. Environment & Database Isolation
 
 | Environment | Frontend URL | Worker API | Database |
 | :--- | :--- | :--- | :--- |
-| **Local (Dev)** | `http://localhost:8000` | `http://127.0.0.1:8787` | Local SQLite in `.wrangler/state/v3/d1/` |
-| **Production** | GitHub Pages URL | Cloudflare Workers Edge | Cloudflare D1 (`host-calculator-db`) |
-
-> **Critical Rule**: AI Agents & Developers MUST default to working in the `Local` environment. Direct schema modifications or manual deletions on `Production` database are strictly prohibited.
-
----
-
-## 6. Deployment & CI/CD Pipeline
-
-```text
-Local Code Editing & Testing
-         |
-    git commit & git push
-         |
-         +---------------------------------------+
-         |                                       |
-  GitHub Repository                     GitHub Pages Deployment
-         |                                 (Frontend static asset update)
-         v
-Cloudflare Workers Builds
- (Triggers `npx wrangler deploy` inside `worker/`)
-         |
-         v
-Cloudflare Workers Production Edge
-```
-
----
-
-## 7. Critical Constraints & Preservation Directives
-
-1. **Do NOT delete or rewrite existing UI features** (`courtledger.html`, `hub.html`, court fee calculations, shuttlecock share calculations, QR code renderer, bill exporter).
-2. **Do NOT alter executed migration files** in `migrations/`. Always append new migrations sequentially (e.g., `0008_xxx.sql`).
-3. **Do NOT expose secrets or credentials** in Git commits (`.env`, Cloudflare tokens, admin keys).
-4. **Preserve CORS preflight handling** in `worker/src/index.js`.
-5. **Full-Screen Sub-Window Standard**: Every feature screen or sub-window entered via button clicks (such as History Bills, Database Dashboards, or Complex Tools) MUST be designed as a full-screen standalone page/view (`.modal-fullscreen`). Do not manufacture tiny or narrow pop-up dialog boxes. Ensure touch scroll isolation (`body.modal-open`) and prevent background page swipe leaks.
+| **Local (Dev)** | `http://127.0.0.1:8787` | `http://127.0.0.1:8787` | Local SQLite in `.wrangler/state/v3/d1/` |
+| **Production** | Cloudflare Pages / Workers URL | Cloudflare Workers Edge | Cloudflare D1 (`host-calculator-db`) |

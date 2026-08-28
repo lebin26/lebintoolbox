@@ -33,6 +33,13 @@
   --danger: #ef4444;
   --danger-muted: rgba(239, 68, 68, 0.12);
 
+  /* ── Financial Overview Tokens ── */
+  --fin-primary: #10b981;
+  --fin-primary-hover: #059669;
+  --fin-primary-subtle: rgba(16, 185, 129, 0.12);
+  --fin-primary-border: rgba(16, 185, 129, 0.28);
+  --fin-primary-glow: rgba(16, 185, 129, 0.2);
+
   /* ── Typography ── */
   --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
   --font-mono: "SF Mono", ui-monospace, "Fira Code", monospace;

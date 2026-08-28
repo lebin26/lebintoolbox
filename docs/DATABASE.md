@@ -14,33 +14,43 @@
 
 ## 2. Table Schemas
 
-### Table: `venues`
-Stores badminton venues along with their hourly pricing tiers (morning / peak-evening).
+### Table: `users`
+Stores user authentication credentials, salted PBKDF2 hashes, profile information, and roles.
 
 ```text
-venues
+users
 ├── id (INTEGER, PK, AUTOINCREMENT)
-├── name (TEXT, NOT NULL, UNIQUE)
-├── rate_morning (REAL, NOT NULL, DEFAULT 0.0)
-├── rate_evening (REAL, NOT NULL, DEFAULT 0.0)
+├── username (TEXT, UNIQUE, NOT NULL)
+├── password_hash (TEXT, NOT NULL)
+├── salt (TEXT, NOT NULL)
+├── role (TEXT, NOT NULL, DEFAULT 'user') -- 'admin' | 'user'
+├── status (TEXT, NOT NULL, DEFAULT 'active') -- 'active' | 'disabled'
+├── nickname (TEXT, NULLABLE)
+├── avatar_url (TEXT, NULLABLE)
+├── allowed_apps (TEXT, DEFAULT '["courtledger","financial"]')
+├── app_permissions (TEXT, DEFAULT '["courtledger:create_bill","courtledger:delete_bill","financial:manage"]')
 ├── created_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
 └── updated_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
 ```
 
-#### Detailed Column Attributes
+---
 
-| Column Name | Data Type | Nullable | Primary Key | Unique | Default Value | Description |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `id` | INTEGER | NO | YES | YES | AUTOINCREMENT | Primary auto-incrementing surrogate key |
-| `name` | TEXT | NO | NO | YES | N/A | Unique venue title (e.g. `Sentul Sports Arena`) |
-| `rate_morning` | REAL | NO | NO | NO | `0.0` | Non-peak / morning hourly rate |
-| `rate_evening` | REAL | NO | NO | NO | `0.0` | Peak / evening hourly rate |
-| `created_at` | DATETIME | YES | NO | NO | `CURRENT_TIMESTAMP` | Record creation timestamp |
-| `updated_at` | DATETIME | YES | NO | NO | `CURRENT_TIMESTAMP` | Last record update timestamp |
+### Table: `admin_logs`
+Audit log recording critical administrative operations.
+
+```text
+admin_logs
+├── id (INTEGER, PK, AUTOINCREMENT)
+├── admin_id (INTEGER, NOT NULL, FK -> users.id)
+├── action (TEXT, NOT NULL)
+├── target_user_id (INTEGER, NULLABLE)
+├── details (TEXT, NULLABLE)
+└── created_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
+```
 
 ---
 
-### Table: `bills`
+### Table: `bills` (Court Ledger - User Isolated)
 Stores historical AA calculation bill snapshots for traceback and record editing.
 
 ```text
@@ -61,180 +71,103 @@ bills
 ├── total_cost (REAL, NOT NULL, DEFAULT 0.0)
 ├── total_revenue (REAL, NOT NULL, DEFAULT 0.0)
 ├── net_profit (REAL, NOT NULL, DEFAULT 0.0)
-├── user_id (INTEGER, NULLABLE)
+├── user_id (INTEGER, NULLABLE, FK -> users.id)
 ├── created_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
 └── updated_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
 ```
 
 ---
 
-### Table: `users`
-Stores user accounts for unified authentication & RBAC system.
+### Table: `financial_platform_templates` (Public Marketplace)
+Stores preset official and community platform templates with logos, categories, and preset product definitions.
 
 ```text
-users
+financial_platform_templates
 ├── id (INTEGER, PK, AUTOINCREMENT)
-├── email (TEXT, UNIQUE, NOT NULL)
-├── password_hash (TEXT, NOT NULL)
-├── plain_password (TEXT, NULLABLE) -- Plaintext password visible only to Administrator for support
 ├── name (TEXT, NOT NULL)
-├── avatar (TEXT, NULLABLE)
-├── role (TEXT, DEFAULT 'user') -- 'user' | 'manager' | 'admin'
-├── status (TEXT, DEFAULT 'active') -- 'active' | 'suspended' | 'deleted'
-├── allowed_apps (TEXT, DEFAULT '["courtledger","advancemanager"]') -- JSON Array of permitted sub-apps
+├── category (TEXT, NOT NULL, DEFAULT 'Banking') -- 'Banking', 'Investment', 'E-Wallet', 'Crypto', 'Pension', 'Forex', 'Cash'
+├── logo_url (TEXT, NULLABLE)
+├── description (TEXT, NULLABLE)
+├── default_currency (TEXT, NOT NULL, DEFAULT 'MYR')
+├── preset_products_json (TEXT, NOT NULL, DEFAULT '[]')
+├── is_official (INTEGER, NOT NULL, DEFAULT 1)
+├── usage_count (INTEGER, NOT NULL, DEFAULT 0)
+├── created_by (INTEGER, NULLABLE, FK -> users.id)
 ├── created_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
-├── updated_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
-└── last_login_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
+└── updated_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
 ```
 
 ---
 
-### Table: `admin_logs`
-Stores audit trail records for all administrative actions performed by Admins.
+### Table: `financial_platforms` (Financial Overview - User Isolated)
+Stores user-specific financial institutions and brokerage platforms.
 
 ```text
-admin_logs
+financial_platforms
 ├── id (INTEGER, PK, AUTOINCREMENT)
-├── admin_user_id (INTEGER, NOT NULL)
-├── admin_name (TEXT, NOT NULL)
-├── action (TEXT, NOT NULL)
-├── target_type (TEXT, NULLABLE)
-├── target_id (TEXT, NULLABLE)
-├── details (TEXT, NULLABLE)
-└── created_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
+├── name (TEXT, NOT NULL)
+├── logo_url (TEXT, NULLABLE)
+├── description (TEXT, NULLABLE)
+├── is_active (INTEGER, NOT NULL, DEFAULT 1)
+├── sort_order (INTEGER, NOT NULL, DEFAULT 0)
+├── user_id (INTEGER, NULLABLE, FK -> users.id)
+├── created_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
+└── updated_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
 ```
 
 ---
 
-## 3. Local SQLite GUI Inspection Guide
+### Table: `financial_products` (Financial Overview - User Isolated)
+Stores user-specific financial products and sub-accounts under a platform.
 
-During local development (`npm run dev`), Wrangler automatically manages a local SQLite file using Miniflare.
-
-### Locating the Local `.sqlite` File
-- **Path**: `.wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite`
-- **GUI Tool Compatibility**:
-  - **DB Browser for SQLite**: Open file directly from the `.wrangler` path above.
-  - **Beekeeper Studio**: Select SQLite connection driver and point to the `.sqlite` file.
-  - **VS Code SQLite Extension** (alexcvzz.vscode-sqlite): Open Command Palette -> `SQLite: Open Database` -> select local `.sqlite` file.
-  - **SQLiteStudio**: Drag & drop the `.sqlite` file into SQLiteStudio.
-
----
-
-### Table: `am_persons` (Advance Manager - 涉及人物)
-Stores contacts/persons involved in debt and advance transactions (isolated by `owner_user_id`).
-
-| Column | Type | Nullable | Primary Key | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `id` | TEXT | NO | YES | Person UUID |
-| `owner_user_id` | TEXT | NO | NO | Owner user account ID |
-| `name` | TEXT | NO | NO | Person real name / display name |
-| `nickname` | TEXT | YES | NO | Optional nickname |
-| `phone` | TEXT | YES | NO | Phone number |
-| `email` | TEXT | YES | NO | Email address |
-| `avatar_url` | TEXT | YES | NO | Avatar URL |
-| `note` | TEXT | YES | NO | Relationship note |
-| `is_archived` | INTEGER | NO | NO | Soft archive flag (0/1) |
-| `created_at` | TEXT | NO | NO | ISO 8601 creation time |
-| `updated_at` | TEXT | NO | NO | ISO 8601 update time |
+```text
+financial_products
+├── id (INTEGER, PK, AUTOINCREMENT)
+├── platform_id (INTEGER, NOT NULL, FK -> financial_platforms.id)
+├── name (TEXT, NOT NULL)
+├── product_type (TEXT, NOT NULL, DEFAULT 'Savings')
+├── currency (TEXT, NOT NULL, DEFAULT 'MYR')
+├── logo_url (TEXT, NULLABLE)
+├── target_allocation_pct (REAL, NOT NULL, DEFAULT 0.0)
+├── is_active (INTEGER, NOT NULL, DEFAULT 1)
+├── sort_order (INTEGER, NOT NULL, DEFAULT 0)
+├── notes (TEXT, NULLABLE)
+├── user_id (INTEGER, NULLABLE, FK -> users.id)
+├── created_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
+└── updated_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
+```
 
 ---
 
-### Table: `am_expenses` (Advance Manager - 垫付主表)
-Stores main expense transaction details. All amounts stored as integer cents.
+### Table: `financial_periods` (Financial Overview - User Isolated)
+Tracks the status and notes of each monthly reporting period per user.
 
-| Column | Type | Nullable | Primary Key | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `id` | TEXT | NO | YES | Expense UUID |
-| `owner_user_id` | TEXT | NO | NO | Owner user ID |
-| `transaction_date` | TEXT | NO | NO | Date/time of expense (ISO 8601) |
-| `description` | TEXT | NO | NO | Purpose / title of advance |
-| `total_amount` | INTEGER | NO | NO | Amount in minimum cents (e.g. 1250 = RM 12.50) |
-| `currency` | TEXT | NO | NO | Currency code (default `MYR`) |
-| `payer_person_id` | TEXT | NO | NO | FK to `am_persons.id` |
-| `category_id` | TEXT | YES | NO | FK to `am_categories.id` |
-| `project_id` | TEXT | YES | NO | FK to `am_projects.id` |
-| `payment_method` | TEXT | NO | NO | Payment method |
-| `status` | TEXT | NO | NO | Status (`unsettled`, `partial`, `settled`, `cancelled`) |
-| `note` | TEXT | YES | NO | Notes |
-| `created_at` | TEXT | NO | NO | Creation time |
-| `updated_at` | TEXT | NO | NO | Update time |
+```text
+financial_periods
+├── id (INTEGER, PK, AUTOINCREMENT)
+├── month_key (TEXT, NOT NULL)
+├── status (TEXT, NOT NULL, DEFAULT 'draft') -- 'draft', 'saved', 'locked'
+├── notes (TEXT, NULLABLE)
+├── user_id (INTEGER, NULLABLE, FK -> users.id)
+├── created_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
+└── updated_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
+```
 
 ---
 
-### Table: `am_expense_participants` (Advance Manager - 分摊明细)
-Stores individual split liability for each person per expense.
+### Table: `financial_snapshots` (Financial Overview)
+Stores native amount, FX rate to base, and converted base amount per product in a period.
 
-| Column | Type | Nullable | Primary Key | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `id` | TEXT | NO | YES | Participant record UUID |
-| `expense_id` | TEXT | NO | NO | FK to `am_expenses.id` |
-| `person_id` | TEXT | NO | NO | FK to `am_persons.id` |
-| `split_type` | TEXT | NO | NO | `equal`, `fixed`, `percentage` |
-| `share_amount` | INTEGER | NO | NO | Liability in cents |
-| `percentage` | REAL | YES | NO | Percentage if split_type = percentage |
-| `created_at` | TEXT | NO | NO | Creation timestamp |
-| `updated_at` | TEXT | NO | NO | Update timestamp |
-
----
-
-### Table: `am_settlements` (Advance Manager - 还款平账结算)
-Records direct repayment transactions between two persons.
-
-| Column | Type | Nullable | Primary Key | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| `id` | TEXT | NO | YES | Settlement UUID |
-| `owner_user_id` | TEXT | NO | NO | Owner user ID |
-| `from_person_id` | TEXT | NO | NO | Debtor paying back (`am_persons.id`) |
-| `to_person_id` | TEXT | NO | NO | Creditor receiving (`am_persons.id`) |
-| `amount` | INTEGER | NO | NO | Repayment amount in cents |
-| `currency` | TEXT | NO | NO | Currency code (default `MYR`) |
-| `settlement_date` | TEXT | NO | NO | Settlement date/time (ISO 8601) |
-| `payment_method` | TEXT | NO | NO | Method of payment |
-| `note` | TEXT | YES | NO | Settlement remarks |
-| `created_at` | TEXT | NO | NO | Creation timestamp |
-| `updated_at` | TEXT | NO | NO | Update timestamp |
-
----
-
-## 4. Migration Rules & Process
-
-1. **Immutable Migrations**: Never modify an existing, applied migration file (such as `migrations/0001_create_venues.sql`).
-2. **Sequential Naming**: Create new migrations using zero-padded prefixes (e.g., `0002_add_venue_address.sql`).
-3. **Local Testing**: Always test migrations locally before applying to production:
-   ```bash
-   # Apply migration locally
-   npm run d1:migrate:local
-   ```
-4. **Production Execution**:
-   ```bash
-   # Apply migration to remote Cloudflare D1
-   npm run d1:migrate
-   ```
-
----
-
-## 5. Backup & Disaster Recovery Strategy
-
-### Local Backup
-- Direct export of local state:
-  ```bash
-  cd worker && npx wrangler d1 export host-calculator-db --local --output=../backups/local_backup.sql
-  ```
-
-### Production Backup
-- Export remote Cloudflare D1 schema & data:
-  ```bash
-  cd worker && npx wrangler d1 export host-calculator-db --remote --output=../backups/prod_backup_$(date +%Y%m%d).sql
-  ```
-
-### Pull Remote Data to Local
-- Pull remote production snapshot to local development database:
-  ```bash
-  npm run d1:pull
-  ```
-
-### Recovery Procedure
-- In case of emergency or data corruption, restore from SQL dump:
-  ```bash
-  cd worker && npx wrangler d1 execute host-calculator-db --remote --file=../backups/prod_backup_YYYYMMDD.sql
-  ```
+```text
+financial_snapshots
+├── id (INTEGER, PK, AUTOINCREMENT)
+├── period_id (INTEGER, NOT NULL, FK -> financial_periods.id)
+├── product_id (INTEGER, NOT NULL, FK -> financial_products.id)
+├── native_amount (REAL, NOT NULL, DEFAULT 0.0)
+├── currency (TEXT, NOT NULL, DEFAULT 'MYR')
+├── fx_rate_to_base (REAL, NOT NULL, DEFAULT 1.0)
+├── base_amount (REAL, NOT NULL, DEFAULT 0.0)
+├── notes (TEXT, NULLABLE)
+├── created_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
+└── updated_at (DATETIME, DEFAULT CURRENT_TIMESTAMP)
+```

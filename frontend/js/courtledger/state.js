@@ -232,8 +232,7 @@
   let savedBills = [];
 
   function getUserBillsKey() {
-    const uid = window.AuthManager && window.AuthManager.user ? window.AuthManager.user.id : 'guest';
-    return 'courtledger_saved_bills_u' + uid;
+    return 'courtledger_saved_bills';
   }
 
   function getLocalBills() {
@@ -254,7 +253,7 @@
   }
 
   function getAuthHeaderObj() {
-    return window.AuthManager ? window.AuthManager.getAuthHeaders() : { 'Content-Type': 'application/json' };
+    return { 'Content-Type': 'application/json' };
   }
 
   async function fetchBills() {
@@ -325,7 +324,7 @@
       newBill = {
         ...billData,
         id: Date.now(),
-        userId: window.AuthManager && window.AuthManager.user ? window.AuthManager.user.id : null,
+        userId: null,
         createdAt: new Date().toISOString()
       };
     }

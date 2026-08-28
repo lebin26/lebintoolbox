@@ -64,242 +64,71 @@ test('Worker API - Venues CRUD', { skip: skipReason }, async () => {
   assert.equal(delRes.status, 200);
 });
 
-test('Worker API - Multi-Tenant Account-Isolated Bills CRUD', { skip: skipReason }, async () => {
-  const shortA = String(Date.now()).slice(-5) + 'a';
-  const shortB = String(Date.now()).slice(-5) + 'b';
+test('Worker API - Bills CRUD', { skip: skipReason }, async () => {
+  const testTitle = `Test Bill ${Date.now()}`;
 
-  // 1. Register User A
-  const regARes = await fetch(`${WORKER_URL}/api/auth/register`, {
+  // 1. Create Bill
+  const postRes = await fetch(`${WORKER_URL}/api/bills`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      email: `user_${shortA}@example.com`,
-      password: 'Password123!',
-      name: `user_${shortA}`
-    })
-  });
-  assert.equal(regARes.status, 201);
-  const userA = await regARes.json();
-  const tokenA = userA.token;
-
-  // 2. Register User B
-  const regBRes = await fetch(`${WORKER_URL}/api/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email: `user_${shortB}@example.com`,
-      password: 'Password123!',
-      name: `user_${shortB}`
-    })
-  });
-  assert.equal(regBRes.status, 201);
-  const userB = await regBRes.json();
-  const tokenB = userB.token;
-
-  // 3. User A creates Bill A
-  const billTitleA = `Bill User A ${shortA}`;
-  const postARes = await fetch(`${WORKER_URL}/api/bills`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${tokenA}`
-    },
-    body: JSON.stringify({
-      title: billTitleA,
-      venueName: 'Arena A',
-      startTime: 18,
-      duration: 2,
-      courtCount: 1,
-      courtFee: 40.0,
-      totalPlayers: 6,
-      hostCount: 1,
-      shuttlesUsed: 3,
-      shuttlePrice: 100.0,
-      additionalShuttles: 0,
-      playerFee: 13.0,
-      totalCost: 65.0,
-      totalRevenue: 65.0,
-      netProfit: 0.0
-    })
-  });
-  assert.equal(postARes.status, 201);
-  const billA = (await postARes.json()).bill;
-
-  // 4. User B creates Bill B
-  const billTitleB = `Bill User B ${shortB}`;
-  const postBRes = await fetch(`${WORKER_URL}/api/bills`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${tokenB}`
-    },
-    body: JSON.stringify({
-      title: billTitleB,
-      venueName: 'Arena B',
-      startTime: 20,
+      title: testTitle,
+      venueName: 'Lavana Setapak',
+      startTime: 16,
       duration: 2,
       courtCount: 2,
-      courtFee: 80.0,
+      courtFee: 118.72,
       totalPlayers: 8,
-      hostCount: 0,
-      shuttlesUsed: 5,
+      hostCount: 1,
+      shuttlesUsed: 4,
       shuttlePrice: 120.0,
       additionalShuttles: 1,
-      playerFee: 16.0,
-      totalCost: 130.0,
-      totalRevenue: 128.0,
-      netProfit: -2.0
+      playerFee: 24.1,
+      totalCost: 158.72,
+      totalRevenue: 168.7,
+      netProfit: 9.98
     })
   });
-  assert.equal(postBRes.status, 201);
-  const billB = (await postBRes.json()).bill;
+  assert.equal(postRes.status, 201);
+  const postData = await postRes.json();
+  assert.equal(postData.bill.title, testTitle);
+  const billId = postData.bill.id;
 
-  // 5. User A fetches bills -> must contain Bill A, but MUST NOT contain Bill B!
-  const getARes = await fetch(`${WORKER_URL}/api/bills`, {
-    headers: { 'Authorization': `Bearer ${tokenA}` }
-  });
-  assert.equal(getARes.status, 200);
-  const billsA = (await getARes.json()).bills;
-  assert.ok(billsA.some(b => b.id === billA.id));
-  assert.ok(!billsA.some(b => b.id === billB.id));
+  // 2. Fetch Bills
+  const getRes = await fetch(`${WORKER_URL}/api/bills`);
+  assert.equal(getRes.status, 200);
+  const getData = await getRes.json();
+  assert.equal(Array.isArray(getData.bills), true);
+  const found = getData.bills.find(b => b.id === billId);
+  assert.ok(found);
 
-  // 6. User B fetches bills -> must contain Bill B, but MUST NOT contain Bill A!
-  const getBRes = await fetch(`${WORKER_URL}/api/bills`, {
-    headers: { 'Authorization': `Bearer ${tokenB}` }
-  });
-  assert.equal(getBRes.status, 200);
-  const billsB = (await getBRes.json()).bills;
-  assert.ok(billsB.some(b => b.id === billB.id));
-  assert.ok(!billsB.some(b => b.id === billA.id));
-
-  // 7. User A attempts to delete User B's bill -> rejected 404
-  const illegalDelRes = await fetch(`${WORKER_URL}/api/bills/${billB.id}`, {
-    method: 'DELETE',
-    headers: { 'Authorization': `Bearer ${tokenA}` }
-  });
-  assert.equal(illegalDelRes.status, 404);
-
-  // 8. User A deletes User A's bill -> 200 OK
-  const delARes = await fetch(`${WORKER_URL}/api/bills/${billA.id}`, {
-    method: 'DELETE',
-    headers: { 'Authorization': `Bearer ${tokenA}` }
-  });
-  assert.equal(delARes.status, 200);
-
-  // 9. User B deletes User B's bill -> 200 OK
-  const delBRes = await fetch(`${WORKER_URL}/api/bills/${billB.id}`, {
-    method: 'DELETE',
-    headers: { 'Authorization': `Bearer ${tokenB}` }
-  });
-  assert.equal(delBRes.status, 200);
-
-  // 10. Clean up test users so no dummy records remain in DB
-  const adminToken = Buffer.from(JSON.stringify({ userId: 1, role: 'admin', ts: Date.now() })).toString('base64');
-  if (userA.user?.id) {
-    await fetch(`${WORKER_URL}/api/admin/users/${userA.user.id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${adminToken}` }
-    });
-  }
-  if (userB.user?.id) {
-    await fetch(`${WORKER_URL}/api/admin/users/${userB.user.id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${adminToken}` }
-    });
-  }
-});
-
-test('Worker API - User Profile & Admin Edit User', { skip: skipReason }, async () => {
-  const shortId = String(Date.now()).slice(-6);
-  const testEmail = `user${shortId}@example.com`;
-  const initialName = `user_${shortId}`;
-  const initialPassword = 'Password123!';
-
-  // 1. Register User
-  const regRes = await fetch(`${WORKER_URL}/api/auth/register`, {
-    method: 'POST',
+  // 3. Update Bill
+  const putRes = await fetch(`${WORKER_URL}/api/bills/${billId}`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      email: testEmail,
-      password: initialPassword,
-      name: initialName
+      title: `${testTitle} Updated`,
+      venueName: 'Lavana Setapak',
+      startTime: 16,
+      duration: 2,
+      courtCount: 2,
+      courtFee: 118.72,
+      totalPlayers: 8,
+      hostCount: 1,
+      shuttlesUsed: 4,
+      shuttlePrice: 120.0,
+      additionalShuttles: 1,
+      playerFee: 25.0,
+      totalCost: 158.72,
+      totalRevenue: 175.0,
+      netProfit: 16.28
     })
   });
-  assert.equal(regRes.status, 201);
-  const regData = await regRes.json();
-  assert.equal(regData.user.name, initialName);
-  const userToken = regData.token;
-  const userId = regData.user.id;
+  assert.equal(putRes.status, 200);
 
-  // 2. User edits own profile (Name and Password)
-  const updatedName = `edit_${shortId}`;
-  const newPassword = 'NewSecretPassword456!';
-  const patchProfileRes = await fetch(`${WORKER_URL}/api/auth/profile`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${userToken}`
-    },
-    body: JSON.stringify({
-      name: updatedName,
-      password: newPassword
-    })
+  // 4. Delete Bill
+  const delRes = await fetch(`${WORKER_URL}/api/bills/${billId}`, {
+    method: 'DELETE'
   });
-  assert.equal(patchProfileRes.status, 200);
-  const patchProfileData = await patchProfileRes.json();
-  assert.equal(patchProfileData.user.name, updatedName);
-
-  // 3. User logs in with new password
-  const loginRes = await fetch(`${WORKER_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email: testEmail,
-      password: newPassword
-    })
-  });
-  assert.equal(loginRes.status, 200);
-  const loginData = await loginRes.json();
-  assert.equal(loginData.user.name, updatedName);
-
-  // 4. Admin edits user (Email, Name, Role, Password)
-  const adminToken = Buffer.from(JSON.stringify({ userId: 1, role: 'admin', ts: Date.now() })).toString('base64');
-
-  const adminEditRes = await fetch(`${WORKER_URL}/api/admin/users/${userId}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${adminToken}`
-    },
-    body: JSON.stringify({
-      name: `adm_${shortId}`,
-      email: `adm_${shortId}@example.com`,
-      role: 'user',
-      status: 'active',
-      password: 'AdminSetPassword789!'
-    })
-  });
-  assert.equal(adminEditRes.status, 200);
-
-  // 5. Admin views user's bills
-  const adminViewBillsRes = await fetch(`${WORKER_URL}/api/admin/users/${userId}/bills`, {
-    headers: { 'Authorization': `Bearer ${adminToken}` }
-  });
-  assert.equal(adminViewBillsRes.status, 200);
-  const adminViewBillsData = await adminViewBillsRes.json();
-  assert.equal(Array.isArray(adminViewBillsData.bills), true);
-  assert.equal(adminViewBillsData.user.id, userId);
-
-  // 6. Admin deletes user
-  const adminDeleteUserRes = await fetch(`${WORKER_URL}/api/admin/users/${userId}`, {
-    method: 'DELETE',
-    headers: { 'Authorization': `Bearer ${adminToken}` }
-  });
-  assert.equal(adminDeleteUserRes.status, 200);
-
-  // Verify user is gone
-  const getDeletedUserRes = await fetch(`${WORKER_URL}/api/admin/users/${userId}`, {
-    headers: { 'Authorization': `Bearer ${adminToken}` }
-  });
-  assert.equal(getDeletedUserRes.status, 404);
+  assert.equal(delRes.status, 200);
 });

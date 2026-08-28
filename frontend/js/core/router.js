@@ -1,69 +1,43 @@
 /**
- * OmniBox - Core Router Module
- * Handles multi-view switching and hash URL navigation.
+ * OmniBox - Core Multi-App Router
+ * Handles seamless view transitions between Auth Gateway, Hub, Court Ledger, and Financial Overview.
  */
 
 (function () {
   const viewTitles = {
-    login: 'Account Login',
+    auth: 'OmniBox | 账号登录',
     hub: 'OmniBox',
     courtledger: 'Court Ledger',
     historybills: 'History Bills',
-    advancemanager: 'Advance Manager',
-    admin: 'Admin Dashboard'
+    financial: 'Financial Overview'
   };
 
   function initRouter() {
     const backToHubBtn = document.getElementById('back-to-hub-btn');
     const headerAppTitle = document.getElementById('header-app-title');
-    const toggleViewBtn = document.getElementById('toggle-view-btn');
+    const courtledgerSettingsBtn = document.getElementById('courtledger-settings-btn');
+    const hubSettingsBtn = document.getElementById('hub-settings-btn');
 
     const views = {
-      login: document.getElementById('view-login'),
+      auth: document.getElementById('view-auth'),
       hub: document.getElementById('view-hub'),
       courtledger: document.getElementById('view-courtledger'),
       historybills: document.getElementById('view-historybills'),
-      advancemanager: document.getElementById('view-advancemanager'),
-      admin: document.getElementById('view-admin')
+      financial: document.getElementById('view-financial')
     };
 
-    let currentActiveViewId = 'hub';
-    let previousViewId = 'hub';
+    let currentActiveViewId = 'auth';
 
     function switchView(targetViewId, updateHash = true) {
-      // 1. Auth Navigation Guard
-      const isLoggedIn = window.AuthManager && window.AuthManager.isLoggedIn;
-
-      if (!isLoggedIn && targetViewId !== 'login') {
-        targetViewId = 'login';
-      } else if (isLoggedIn && targetViewId === 'login') {
+      // Authentication barrier: require login before accessing hub or sub-apps
+      const isLoggedIn = window.Auth && typeof window.Auth.isLoggedIn === 'function' ? window.Auth.isLoggedIn() : false;
+      if (!isLoggedIn) {
+        targetViewId = 'auth';
+      } else if (targetViewId === 'auth') {
         targetViewId = 'hub';
       }
 
-      // 2. Sub-App Access Permission Guard
-      if (isLoggedIn && window.AuthManager && typeof window.AuthManager.hasAppAccess === 'function') {
-        if ((targetViewId === 'courtledger' || targetViewId === 'historybills') && !window.AuthManager.hasAppAccess('courtledger')) {
-          if (typeof window.showToast === 'function') {
-            window.showToast('⛔ 访问权限不足：您当前暂无【Court Ledger】的访问授权，请联系 Admin 开通！');
-          }
-          targetViewId = 'hub';
-        } else if (targetViewId === 'advancemanager' && !window.AuthManager.hasAppAccess('advancemanager')) {
-          if (typeof window.showToast === 'function') {
-            window.showToast('⛔ 访问权限不足：您当前暂无【Advance Manager】的访问授权，请联系 Admin 开通！');
-          }
-          targetViewId = 'hub';
-        } else if (targetViewId === 'admin' && !window.AuthManager.hasAppAccess('admin')) {
-          if (typeof window.showToast === 'function') {
-            window.showToast('⛔ 访问权限不足：您当前暂无【Admin Console】的访问授权，请联系 Admin 开通！');
-          }
-          targetViewId = 'hub';
-        }
-      }
-
-      if (!views[targetViewId]) targetViewId = isLoggedIn ? 'hub' : 'login';
-      if (currentActiveViewId !== targetViewId) {
-        previousViewId = currentActiveViewId;
-      }
+      if (!views[targetViewId]) targetViewId = isLoggedIn ? 'hub' : 'auth';
       currentActiveViewId = targetViewId;
 
       Object.keys(views).forEach(vKey => {
@@ -84,46 +58,28 @@
         headerAppTitle.textContent = viewTitles[targetViewId] || 'OmniBox';
       }
 
+      // Back Button visibility
       if (backToHubBtn) {
-        if (targetViewId === 'hub' || targetViewId === 'login') {
+        if (targetViewId === 'hub' || targetViewId === 'auth') {
           backToHubBtn.classList.add('hidden');
         } else {
           backToHubBtn.classList.remove('hidden');
           const btnText = backToHubBtn.querySelector('.btn-text');
           if (btnText) {
-            if (targetViewId === 'historybills') {
-              btnText.textContent = 'Court Ledger';
-            } else if (targetViewId === 'admin') {
-              btnText.textContent = previousViewId === 'courtledger' ? 'Court Ledger' : 'OmniBox';
-            } else {
-              btnText.textContent = 'OmniBox';
-            }
+            btnText.textContent = targetViewId === 'historybills' ? 'Court Ledger' : 'OmniBox';
           }
         }
       }
 
-      const hubHeaderActions = document.getElementById('hub-header-actions');
-      const courtledgerHeaderActions = document.getElementById('courtledger-header-actions');
-      const advancemanagerHeaderActions = document.getElementById('advancemanager-header-actions');
-      const adminMenuToggleBtn = document.getElementById('admin-menu-toggle-btn');
-      const amMenuToggleBtn = document.getElementById('am-menu-toggle-btn');
-
-      if (hubHeaderActions) {
-        hubHeaderActions.classList.toggle('hidden', targetViewId !== 'hub');
+      // Settings dropdown button visibility
+      if (courtledgerSettingsBtn) {
+        courtledgerSettingsBtn.classList.toggle('hidden', targetViewId !== 'courtledger');
       }
-      if (courtledgerHeaderActions) {
-        courtledgerHeaderActions.classList.toggle('hidden', targetViewId !== 'courtledger');
-      }
-      if (advancemanagerHeaderActions) {
-        advancemanagerHeaderActions.classList.toggle('hidden', targetViewId !== 'advancemanager');
-      }
-      if (adminMenuToggleBtn) {
-        adminMenuToggleBtn.classList.toggle('hidden', targetViewId !== 'admin');
-      }
-      if (amMenuToggleBtn) {
-        amMenuToggleBtn.classList.toggle('hidden', targetViewId !== 'advancemanager');
+      if (hubSettingsBtn) {
+        hubSettingsBtn.classList.toggle('hidden', targetViewId !== 'hub');
       }
 
+      // Trigger sub-app specific hooks
       if (targetViewId === 'courtledger') {
         if (window.CourtLedgerUI && typeof window.CourtLedgerUI.calculate === 'function') {
           window.CourtLedgerUI.calculate();
@@ -138,20 +94,16 @@
         } else if (window.CourtLedgerUI && typeof window.CourtLedgerUI.renderBillsList === 'function') {
           window.CourtLedgerUI.renderBillsList();
         }
-      } else if (targetViewId === 'admin') {
-        if (window.AdminModule && typeof window.AdminModule.loadActiveTabData === 'function') {
-          window.AdminModule.loadActiveTabData();
-        }
-      } else if (targetViewId === 'advancemanager') {
-        if (window.AdvanceManagerUI && typeof window.AdvanceManagerUI.loadInitialData === 'function') {
-          window.AdvanceManagerUI.loadInitialData();
+      } else if (targetViewId === 'financial') {
+        if (window.FinancialUI && typeof window.FinancialUI.initFinancialUI === 'function') {
+          window.FinancialUI.initFinancialUI();
         }
       }
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
 
       if (updateHash) {
-        if (targetViewId === 'hub') {
+        if (targetViewId === 'hub' || targetViewId === 'auth') {
           if (window.location.hash) {
             history.pushState('', document.title, window.location.pathname + window.location.search);
           }
@@ -161,43 +113,35 @@
       }
     }
 
+    // Bind Shortcut Cards in Main Hub
+    function bindCardClicks() {
+      const cards = document.querySelectorAll('.shortcut-card[data-target-view], [data-target-view]');
+      cards.forEach(card => {
+        card.addEventListener('click', () => {
+          const target = card.getAttribute('data-target-view');
+          if (target) switchView(target);
+        });
+      });
+    }
+    bindCardClicks();
+
+    // Bind Back to Hub Button
     if (backToHubBtn) {
       backToHubBtn.addEventListener('click', () => {
         if (currentActiveViewId === 'historybills') {
           switchView('courtledger');
-        } else if (currentActiveViewId === 'admin') {
-          switchView(previousViewId === 'courtledger' ? 'courtledger' : 'hub');
         } else {
           switchView('hub');
         }
       });
     }
 
-    const toolCards = document.querySelectorAll('.tool-card[data-target-view], .shortcut-card[data-target-view]');
-    toolCards.forEach(card => {
-      card.addEventListener('click', () => {
-        const targetView = card.getAttribute('data-target-view');
-        if (targetView) {
-          if (card.classList.contains('is-locked') || (window.AuthManager && !window.AuthManager.hasAppAccess(targetView))) {
-            const appTitles = {
-              courtledger: 'Court Ledger',
-              advancemanager: 'Advance Manager',
-              admin: 'Admin Console'
-            };
-            const appName = appTitles[targetView] || targetView;
-            if (typeof window.showToast === 'function') {
-              window.showToast(`⛔ 访问权限不足：您当前暂无【${appName}】的访问授权，请联系 Admin 开通！`);
-            }
-            return;
-          }
-          switchView(targetView);
-        }
-      });
-    });
-
     function handleHashRoute() {
       const hash = window.location.hash.replace('#', '').trim().toLowerCase();
-      if (hash && views[hash]) {
+      const isLoggedIn = window.Auth && typeof window.Auth.isLoggedIn === 'function' ? window.Auth.isLoggedIn() : false;
+      if (!isLoggedIn) {
+        switchView('auth', false);
+      } else if (hash && views[hash] && hash !== 'auth') {
         switchView(hash, false);
       } else {
         switchView('hub', false);
@@ -205,11 +149,31 @@
     }
 
     window.addEventListener('hashchange', handleHashRoute);
+
+    // Listen to Auth State Changes
+    window.addEventListener('auth:change', (e) => {
+      if (e.detail && e.detail.isLoggedIn) {
+        if (currentActiveViewId === 'auth') {
+          const hash = window.location.hash.replace('#', '');
+          switchView(hash && views[hash] && hash !== 'auth' ? hash : 'hub');
+        }
+      } else {
+        switchView('auth');
+      }
+    });
+
     handleHashRoute();
 
     window.AppRouter.switchView = switchView;
-    return { switchView };
+    window.AppRouter.bindCardClicks = bindCardClicks;
   }
 
   window.AppRouter = { initRouter, viewTitles, switchView: null };
+
+  // Auto initialize on DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRouter);
+  } else {
+    initRouter();
+  }
 })();

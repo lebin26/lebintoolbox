@@ -2448,67 +2448,88 @@ body.modal-open {
   color: var(--text-secondary, #475569);
 }
 
-.roster-modal-footer {
+/* ── Pure Calculation View Layout (Desktop / Mobile) ── */
+.calc-main-layout {
   display: flex;
-  justify-content: flex-end;
-  padding: 14px 18px;
-  background: var(--surface, #f8fafc);
-  border-top: 1.5px solid var(--border-default, #e2e8f0);
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
-.btn-settle-archive {
-  font-weight: 800;
-  font-size: 0.95rem;
-  padding: 10px 20px;
-  border-radius: var(--radius-md, 10px);
+@media (min-width: 900px) {
+  .calc-main-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: var(--space-6);
+    align-items: start;
+  }
 }
 
-.btn-success-glow {
-  background: linear-gradient(135deg, #10b981, #059669) !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
-  font-weight: 800;
+.studio-sidepanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
 }
 
-/* Dark theme explicit overrides */
-html[data-theme="dark"] .modal-roster-card,
-body.dark .modal-roster-card {
-  background: #18181b;
-  border-color: rgba(255, 255, 255, 0.15);
-  color: #f4f4f5;
+.desktop-ticker-card {
+  display: none;
 }
 
-html[data-theme="dark"] .roster-input-box,
-html[data-theme="dark"] .roster-summary-bar,
-html[data-theme="dark"] .roster-modal-footer,
-body.dark .roster-input-box,
-body.dark .roster-summary-bar,
-body.dark .roster-modal-footer {
-  background: #27272a;
-  border-color: rgba(255, 255, 255, 0.12);
+@media (min-width: 900px) {
+  .desktop-ticker-card {
+    display: block;
+    background: var(--background);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    text-align: center;
+  }
+  .mobile-only-ticker {
+    display: none !important;
+  }
 }
 
-html[data-theme="dark"] .roster-textarea,
-body.dark .roster-textarea {
-  background: #18181b;
-  color: #f4f4f5;
-  border-color: rgba(255, 255, 255, 0.2);
+.shuttle-summary-card {
+  background: var(--surface-hover);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-bottom: 12px;
 }
 
-html[data-theme="dark"] .roster-player-card,
-body.dark .roster-player-card {
-  background: #27272a;
-  border-color: rgba(255, 255, 255, 0.12);
+.shuttle-summary-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
 }
 
-html[data-theme="dark"] .player-name,
-body.dark .player-name {
-  color: #fafafa;
+.shuttle-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
 }
 
-html[data-theme="dark"] .player-num,
-body.dark .player-num {
-  background: #3f3f46;
-  color: #fafafa;
+.shuttle-summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
 }
+
+.shuttle-summary-item .item-label {
+  color: var(--text-muted);
+}
+
+.shuttle-summary-item .item-val {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.tag-blue { color: #3b82f6 !important; }
+.tag-green { color: #10b981 !important; }
+.tag-accent { color: var(--accent) !important; }
 

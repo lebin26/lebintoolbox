@@ -1,35 +1,31 @@
 {
   "name": "omnibox",
   "version": "1.0.0",
-  "description": "OmniBox - 多功能应用聚合平台 (Featuring Court Ledger)",
+  "description": "OmniBox - 多功能应用聚合平台 (Court Ledger & Financial Overview)",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n \"frontend,worker\" -c \"cyan,magenta\" \"npm run dev:frontend\" \"npm run dev:worker\"",
-    "dev:frontend": "vite",
-    "dev:worker": "cd worker && npx wrangler dev",
+    "dev": "cd worker && npx wrangler dev",
     "start": "npm run dev",
     "test": "node --test tests/*.test.mjs",
-    "test:unit": "node --test tests/api_schema.test.mjs tests/calculator.test.mjs tests/bills.test.mjs",
+    "test:unit": "node --test tests/api_schema.test.mjs tests/calculator.test.mjs tests/bills.test.mjs tests/financial_overview.test.mjs",
     "test:e2e": "node --test tests/courtledger_e2e.test.mjs",
     "worker:dev": "cd worker && npx wrangler dev",
     "worker:deploy": "cd worker && npx wrangler deploy",
     "d1:migrate": "cd worker && npx wrangler d1 execute host-calculator-db --remote --file=../migrations/0001_create_venues.sql",
     "d1:migrate:local": "cd worker && npx wrangler d1 execute host-calculator-db --local --file=../migrations/0001_create_venues.sql",
-    "d1:sync:data": "cd worker && npx wrangler d1 export host-calculator-db --local --no-schema --output=./dump_data.sql && sed -i '' 's/INSERT INTO/INSERT OR REPLACE INTO/g' ./dump_data.sql && npx wrangler d1 execute host-calculator-db --remote --file=./dump_data.sql && rm ./dump_data.sql",
     "d1:pull": "cd worker && rm -rf .wrangler/state/v3/d1 && npx wrangler d1 export host-calculator-db --remote --output=./dump_remote.sql && npx wrangler d1 execute host-calculator-db --local --file=./dump_remote.sql && rm ./dump_remote.sql"
   },
   "keywords": [
     "badminton",
     "calculator",
     "court-ledger",
+    "financial-overview",
     "cloudflare-worker",
     "cloudflare-d1"
   ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "concurrently": "^10.0.5",
-    "playwright": "^1.62.1",
-    "vite": "^8.2.1"
+    "wrangler": "^3.109.2"
   }
 }

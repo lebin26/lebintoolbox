@@ -1,3374 +1,3148 @@
-标题：垫付 / 往来账管理 Sub-App —— 完整系统架构与实现规范
+# 一、这个第三个 Sub-App 应该解决什么问题
 
-你现在负责实现我的 Toolbox 中第二个 Sub-App：
+你的目标本质上不是“记账”，而是建立一个：
 
-【Sub-App 名称】
-垫付管理 / Advance Manager
+> **Monthly Financial Overview / 资产配置追踪系统**
 
-【核心目标】
-这是一个“人与人之间垫付、分摊、欠款、还款、结算”的完整管理系统。
+核心层级应该是：
 
-它不是普通 Expense Tracker。
+```text
+我的全部资金
+│
+├── Platform / 平台
+│   ├── Product / 产品
+│   │   └── Monthly Balance / 月末余额
+│   ├── Product
+│   └── Product
+│
+├── Platform
+│   ├── Product
+│   └── Product
+│
+└── Platform
+```
 
-系统最核心的问题是：
+例如：
 
-1. 谁付了钱
-2. 付了多少钱
-3. 为什么付
-4. 哪些人涉及这笔费用
-5. 每个人应该承担多少钱
-6. 每个人已经支付多少钱
-7. 每个人还欠多少钱
-8. 谁欠我钱
-9. 我欠谁钱
-10. 已经还了多少
-11. 什么时候还的
-12. 当前最终净余额是多少
+```text
+Hong Leong Bank
+├── Savings
+├── Fixed Deposit
+└── Current Account
 
-系统必须围绕“债务关系”和“结算”设计，而不是只围绕“消费记录”设计。
+Maybank
+├── Savings
+└── Fixed Deposit
 
+IBKR
+└── Cash
 
-==================================================
-一、技术栈与开发约束
-==================================================
+Other
+└── E-Wallet
+```
 
-前端：
+最终系统回答的是：
 
-HTML
-CSS
-Vanilla JavaScript
+> **“我现在一共有多少钱？”**
 
-不要使用 React / Vue / Angular / Next.js，除非我明确要求。
+> **“这些钱分别放在哪里？”**
 
-后端：
+> **“Hong Leong 占我的总资金多少？”**
 
-Cloudflare Workers
+> **“Savings / Fixed Deposit 各占多少？”**
 
-数据库：
+> **“过去 12 个月资金是增加还是减少？”**
 
-Cloudflare D1 / SQLite
+> **“这个月比上个月多了多少？”**
 
-原则：
+> **“我的资产配置有没有偏离目标？”**
 
-Frontend
-↓
-API
-↓
-Cloudflare Worker
-↓
-SQLite / D1
+---
 
-前端绝对不能直接操作数据库。
+# 二、最重要的设计：不要只记录 Current Balance
 
-所有数据读取、创建、修改、删除必须经过 API。
+这是整个系统最关键的地方。
 
-API 必须负责：
+不要设计成：
 
-- Authentication
-- Authorization
-- Validation
-- Business Logic
-- Database Access
-- Calculation
-- Transaction
-- Error Handling
+```text
+Product
+└── current_balance
+```
 
+因为你未来会无法正确回答：
 
-==================================================
-二、整个系统的核心设计原则
-==================================================
+> 2026 年 1 月我有多少钱？
 
-必须遵守：
+应该保存每个月的历史快照：
 
-1. Data First
-2. Database First
-3. Business Logic First
-4. API First
-5. UI Last
+```text
+Hong Leong
+└── Savings
+    ├── 2026-01 → RM 5,000
+    ├── 2026-02 → RM 5,500
+    ├── 2026-03 → RM 6,200
+    └── 2026-04 → RM 6,800
+```
 
-开发顺序：
+所以数据模型必须是：
 
-Database Schema
-↓
-Data Model
-↓
-Business Rules
-↓
-API
-↓
-Validation
-↓
-Frontend State
-↓
-UI
-↓
-Statistics
-↓
-Optimization
+```text
+Platform
+   ↓
+Product
+   ↓
+Monthly Snapshot
+```
 
-不要先堆 UI 再反推数据库。
+这也是为什么你的资金曲线、月度比较、平台占比都可以从历史数据准确计算出来。
 
+---
 
-==================================================
-三、系统架构
-==================================================
+# 三、完整功能规划
 
-系统分成：
+## 1. Dashboard —— 最重要的首页
 
-Toolbox
-└── Advance Manager
-    ├── Dashboard
-    ├── Expenses
-    ├── People
-    ├── Projects
-    ├── Settlements
-    ├── Statistics
-    └── Settings
+打开 Sub-App 第一眼应该直接看到：
 
+```text
+Monthly Financial Overview
 
-逻辑层：
+Total Assets
+RM 128,520.00
 
-UI
-↓
-API Client
-↓
-Cloudflare Worker Router
-↓
-Auth Middleware
-↓
-Validation
-↓
-Business Service
-↓
-Repository / DB Layer
-↓
-SQLite / D1
+↑ RM 5,240.00
++4.24% vs last month
+```
 
+下面：
 
-前端必须采用模块化 JS。
+```text
+Platform Allocation
+
+Hong Leong Bank       RM 42,500    33.1%
+Maybank               RM 25,000    19.4%
+IBKR                  RM 35,000    27.2%
+Others                RM 26,020    20.3%
+```
+
+再下面：
+
+```text
+Asset Trend
+━━━━━━━━━━━━━━━━━━━━
+       ╭────╮
+   ╭───╯    ╰────╮
+───╯              ╰──
+Jan Feb Mar Apr May Jun
+```
+
+然后：
+
+```text
+Top Changes This Month
+
+Hong Leong Savings     +RM 2,000
+IBKR Cash              +RM 1,500
+Maybank FD             -RM 500
+```
+
+---
+
+# 四、Platform 管理
+
+Platform 是：
+
+> **资金放在哪一个机构/平台**
+
+例如：
+
+```text
+Hong Leong Bank
+Maybank
+CIMB
+Interactive Brokers
+Touch 'n Go
+Rakuten Trade
+```
+
+每个平台应该可以设置：
+
+```text
+Name
+Logo
+Description
+Display Order
+Status
+Notes
+```
+
+例如：
+
+```text
+Hong Leong Bank
+
+[LOGO]
+
+Savings
+Fixed Deposit
+```
+
+### Logo
 
 建议：
 
-/js
-    api.js
-    auth.js
-    state.js
-    router.js
-    utils.js
-    formatters.js
-    validators.js
-
-    modules/
-        dashboard.js
-        expenses.js
-        persons.js
-        projects.js
-        settlements.js
-        statistics.js
-
-    components/
-        modal.js
-        toast.js
-        table.js
-        form.js
-        dropdown.js
-        confirm.js
-
-    pages/
-        dashboard.js
-        expenses.js
-        expense-detail.js
-        persons.js
-        person-detail.js
-        projects.js
-        project-detail.js
-        settlements.js
-        statistics.js
-
-
-==================================================
-四、数据库设计
-==================================================
-
-不要把所有信息放在一个 expense table。
-
-必须使用关系型结构。
-
-
---------------------------------------
-TABLE 1: users
---------------------------------------
-
-用途：
-
-系统登录用户。
-
-字段：
-
-id
-uuid / TEXT PRIMARY KEY
-
-email
-TEXT UNIQUE NOT NULL
-
-name
-TEXT NOT NULL
-
-avatar_url
-TEXT NULL
-
-role
-TEXT NOT NULL DEFAULT 'user'
-
-status
-TEXT NOT NULL DEFAULT 'active'
-
-created_at
-TEXT NOT NULL
-
-updated_at
-TEXT NOT NULL
-
-
-role：
-
-user
-admin
-
-
-status：
-
-active
-disabled
-
-
-注意：
-
-Admin 同时也是普通 User。
-
-Admin 不应该变成另一种不能使用普通功能的账户。
-
-Admin：
-
-可以正常创建自己的 Expense
-可以成为 Payer
-可以成为 Participant
-可以查看自己的 Dashboard
-同时拥有 Admin 权限。
-
-
---------------------------------------
-TABLE 2: persons
---------------------------------------
-
-用途：
-
-系统中的“涉及人物”。
-
-注意：
-
-Person 不等于 User。
-
-User 是系统登录账号。
-
-Person 是现实中的人。
-
-例如：
-
-John
-Mary
-Peter
-
-这些人完全不需要拥有系统账号。
-
-
-字段：
-
-id
-TEXT PRIMARY KEY
-
-owner_user_id
-TEXT NOT NULL
-
-name
-TEXT NOT NULL
-
-nickname
-TEXT NULL
-
-phone
-TEXT NULL
-
-email
-TEXT NULL
-
-avatar_url
-TEXT NULL
-
-note
-TEXT NULL
-
-is_archived
-INTEGER DEFAULT 0
-
-created_at
-TEXT NOT NULL
-
-updated_at
-TEXT NOT NULL
-
-
-必须使用 owner_user_id 隔离不同用户的数据。
-
-
---------------------------------------
-TABLE 3: categories
---------------------------------------
-
-字段：
-
-id
-owner_user_id
-name
-icon
-sort_order
-is_archived
-created_at
-updated_at
-
-
-系统默认分类：
-
-Food
-Transport
-Accommodation
-Shopping
-Entertainment
-Sports
-Travel
-Bills
-Education
-Healthcare
-Other
-
-
-用户可以自行创建分类。
-
-
---------------------------------------
-TABLE 4: projects
---------------------------------------
-
-用途：
-
-旅行 / 聚餐 / 羽毛球 / 活动 / 项目。
-
-字段：
-
-id
-owner_user_id
-name
-description
-start_date
-end_date
-status
-created_at
-updated_at
-
-
-status：
-
-active
-completed
-archived
-
-
-例如：
-
-Langkawi Trip
-Badminton
-Dinner
-Japan Trip
-
-
---------------------------------------
-TABLE 5: expenses
---------------------------------------
-
-这是主交易表。
-
-字段：
-
-id
-owner_user_id
-
-transaction_date
-
-description
-
-total_amount
-
-currency
-
-payer_person_id
-
-category_id
-
-project_id
-
-payment_method
-
-status
-
-note
-
-created_at
-
-updated_at
-
-
-推荐：
-
-total_amount 使用整数最小货币单位保存。
-
-例如：
-
-RM 12.50
-
-数据库保存：
-
-1250
-
-不要直接保存 FLOAT。
-
-这样避免：
-
-12.5
-12.499999
-之类的浮点误差。
-
-
-currency：
-
-MYR
-USD
-SGD
-等。
-
-默认：
-
-MYR
-
-
-payment_method：
-
-cash
-card
-bank_transfer
-ewallet
-other
-
-
-status：
-
-unsettled
-partial
-settled
-cancelled
-
-
-payer_person_id：
-
-必须指向 persons。
-
-
-重要：
-
-系统必须支持：
-
-“我替别人付款”
-
-也支持：
-
-“别人替我付款”
-
-
---------------------------------------
-TABLE 6: expense_participants
---------------------------------------
-
-这是整个系统最重要的表之一。
-
-一个 Expense 可以关联多个 Person。
-
-字段：
-
-id
-
-expense_id
-
-person_id
-
-split_type
-
-share_amount
-
-percentage
-
-paid_amount
-
-balance_amount
-
-created_at
-
-updated_at
-
-
-split_type：
-
-equal
-fixed
-percentage
-
-
-share_amount：
-
-这个人最终应该承担多少钱。
-
-
-paid_amount：
-
-这个人已经实际支付了多少钱。
-
-
-balance_amount：
-
-share_amount - paid_amount
-
-
-必须支持：
-
-4 人平分
-指定金额
-百分比分摊。
-
-
-例：
-
-总金额 RM120
-
-John RM40
-Mary RM40
-Peter RM40
-
-
---------------------------------------
-TABLE 7: settlements
---------------------------------------
-
-用于还款 / 结算。
-
-字段：
-
-id
-
-owner_user_id
-
-from_person_id
-
-to_person_id
-
-amount
-
-currency
-
-settlement_date
-
-payment_method
-
-note
-
-created_at
-
-updated_at
-
-
-例如：
-
-John
-→
-Lebin
-
-RM50
-
-
-必须支持：
-
-部分还款。
-
-
---------------------------------------
-TABLE 8: attachments
---------------------------------------
-
-用于账单 / 收据 / 图片 / PDF。
-
-字段：
-
-id
-
-owner_user_id
-
-expense_id
-
-file_name
-
-file_url
-
-mime_type
-
-file_size
-
-created_at
-
-
-以后可以迁移到：
-
-Cloudflare R2。
-
-
---------------------------------------
-TABLE 9: audit_logs
---------------------------------------
-
-必须保留修改记录。
-
-字段：
-
-id
-
-owner_user_id
-
-entity_type
-
-entity_id
-
-action
-
-old_data
-
-new_data
-
-created_at
-
-
-action：
-
-create
-update
-delete
-settle
-cancel
-
-
-这个系统必须具备可追踪性。
-
-
-==================================================
-五、数据库关系
-==================================================
-
-users
-    ↓
-persons
-
-persons
-    ↓
-expenses
-
-expenses
-    ↓
-expense_participants
-
-expenses
-    ↓
-attachments
-
-persons
-    ↓
-settlements
-
-projects
-    ↓
-expenses
-
-categories
-    ↓
-expenses
-
-
-逻辑关系：
-
-User
- ├── Persons
- ├── Expenses
- ├── Projects
- ├── Categories
- └── Settlements
-
-
-Expense
- ├── Payer
- ├── Participants
- ├── Category
- ├── Project
- └── Attachments
-
-
-==================================================
-六、最重要的业务逻辑
-==================================================
-
-
-核心公式：
-
-Outstanding Participant Balance
-
-balance =
-share_amount - paid_amount
-
-
-Expense Outstanding：
-
-total participant balances
-
-
-但是更重要的是：
-
-Person Net Balance
-
-
-必须支持：
-
-A owes B
-
-B owes A
-
-最后计算 Net Balance。
-
-
-例如：
-
-John owes Lebin RM100
-Lebin owes John RM40
-
-最终：
-
-John owes Lebin RM60
-
-
-不要让 Dashboard 显示：
-
-John +100
-John -40
-
-而应该显示：
-
-John
-+RM60
-
-John owes you
-
-
-==================================================
-七、Expense 创建逻辑
-==================================================
-
-用户点击：
-
-+ New Advance
-
-第一阶段只要求：
-
-Amount
-Description
-People
-
-
-例如：
-
-RM120
-Dinner
-John
-Mary
-Peter
-
-
-选择：
-
-Equal Split
-
-
-系统自动：
-
-RM120 / 3
-
-John = RM40
-Mary = RM40
-Peter = RM40
-
-
-同时：
-
-Payer = 当前 User
-
-
-如果当前 User = Lebin：
-
-Lebin 支付 RM120。
-
-
-系统形成：
-
-Lebin → John RM40
-Lebin → Mary RM40
-Lebin → Peter RM40
-
-
-==================================================
-八、支持“别人先付款”
-==================================================
-
-例如：
-
-John 支付 RM100
-
-实际参与：
-
-Lebin
-John
-Mary
-
-
-每人应该承担：
-
-RM33.33
-
-
-系统必须能够正确计算：
-
-John 先支付 RM100
-
-所以：
-
-John 不欠别人
-
-其他人分别欠 John。
-
-
-因此：
-
-Payer 不应该被简单当成“参与者中的一个普通人”。
-
-
-必须计算：
-
-个人实际支付金额
-+
-个人应承担金额
-+
-净余额。
-
-
-==================================================
-九、统一 Balance Engine
-==================================================
-
-不要在不同页面分别写余额计算。
-
-必须建立：
-
-Balance Engine
-
-例如：
-
-calculateExpenseBalance()
-
-calculatePersonBalance()
-
-calculateProjectBalance()
-
-calculateOutstanding()
-
-calculateNetBalance()
-
-
-所有页面都调用统一 Business Logic。
-
-
-禁止：
-
-Dashboard 自己算一次
-Person Page 再算一次
-Statistics 再算一次
-
-
-否则以后一定会出现不同页面数字不一致。
-
-
-==================================================
-十、Person Balance
-==================================================
-
-每个人必须有：
-
-Total Advanced
-
-Total Owed
-
-Total Received
-
-Total Paid
-
-Outstanding
-
-Net Balance
-
-
-例如：
-
-John
-
-You advanced for John:
-RM300
-
-John paid for you:
-RM50
-
-John settled:
-RM100
-
-Net:
-
-RM150
-
-
-页面必须清晰告诉用户：
-
-John owes you RM150
-
-
-而不是只显示一堆数字。
-
-
-==================================================
-十一、Settlement 逻辑
-==================================================
-
-用户打开：
-
-Person → John
-
-看到：
-
-Outstanding
-RM150
-
-
-点击：
-
-Settle
-
-
-弹出：
-
-Amount
-RM150
-
-Date
-Payment Method
-Note
-
-
-保存之后：
-
-Settlement record 创建。
-
-
-然后 Balance Engine 重新计算。
-
-
-不能直接修改原 Expense 的金额作为“还款”。
-
-必须：
-
-Expense 永久保持原始数据。
-
-Settlement 是独立交易。
-
-
-例如：
-
-Original Expense:
-
-RM150
-
-
-Settlement:
-
-RM50
-
-
-Remaining:
-
-RM100
-
-
-再次：
-
-RM50
-
-
-Remaining:
-
-RM50
-
-
-再次：
-
-RM50
-
-
-Remaining:
-
-RM0
-
-
-Status：
-
-Settled
-
-
-==================================================
-十二、禁止破坏历史数据
-==================================================
-
-非常重要。
-
-一笔已经发生的 Expense：
-
-不能通过“更新 total_amount”来模拟还钱。
-
-不能删除已经发生的交易来模拟取消。
-
-不能修改历史数据而没有 audit log。
-
-
-数据必须保持：
-
-原始记录
-+
-后续变化
-
-
-这使系统具备财务记录的基本可追踪性。
-
-
-==================================================
-十三、Expense 编辑
-==================================================
-
-允许编辑：
-
-description
-date
-category
-project
-note
-payment_method
-
-金额和 participants 可以修改。
-
-但是：
-
-如果 Expense 已经产生 Settlement：
-
-不要允许无条件修改金额。
-
-必须：
-
-1. 检查 Settlement
-2. 如果存在 Settlement
-3. 给出警告
-4. 防止造成负余额
-
-
-最好提供：
-
-“Reverse / Correct”
-
-而不是直接破坏原始交易。
-
-
-==================================================
-十四、删除逻辑
-==================================================
-
-不要物理 DELETE 重要交易。
-
-Expense：
-
-采用 soft delete / cancelled。
-
-例如：
-
-status = cancelled
-
-
-并写入：
-
-audit_logs
-
-
-Person：
-
-也不要直接删除。
-
-使用：
-
-is_archived = 1
-
-
-Category：
-
-archive
-
-
-Project：
-
-archive
-
-
-这样历史记录永远不会失效。
-
-
-==================================================
-十五、Data Entry 设计
-==================================================
-
-新增 Expense 必须支持：
-
-【必填】
-
-Amount
-Description
-Payer
-At least 1 participant
-Date
-
-
-【可选】
-
-Category
-Project
-Payment Method
-Note
-Attachment
-
-
-默认：
-
-Date = 当前日期时间
-
-Payer = 当前 User
-
-Currency = MYR
-
-Split = Equal
-
-
-==================================================
-十六、快速新增模式
-==================================================
-
-第一版必须优化“快速记录”。
-
-用户只需要：
-
-Amount
-
-Description
-
-People
-
-Save
-
-
-例如：
-
-100
-
-Dinner
-
-John
-Mary
-
-
-Save。
-
-
-高级字段放入：
-
-More Options
-
-
-避免第一次使用就看到巨大表单。
-
-
-==================================================
-十七、支持三种 Split
-==================================================
-
-1. Equal
-
-系统平均分。
-
-2. Fixed
-
-例如：
-
-John 20
-Mary 30
-Peter 50
-
-
-总和必须等于 Expense Total。
-
-3. Percentage
-
-例如：
-
-John 50%
-Mary 30%
-Peter 20%
-
-
-总和必须 = 100%。
-
-
-所有输入都必须实时显示：
-
-Remaining
-
-如果：
-
-Total = RM100
-
-已分：
-
-RM80
-
-
-显示：
-
-Remaining RM20
-
-
-如果超出：
-
-RM110
-
-显示：
-
-Over by RM10
-
-禁止提交。
-
-
-==================================================
-十八、金额精度
-==================================================
-
-所有金额必须使用整数最小货币单位。
-
-例如：
-
-RM10.50
-
-保存：
-
-1050
-
-
-显示的时候：
-
-10.50
-
-
-禁止使用：
-
-parseFloat()
-
-直接作为核心财务计算。
-
-
-==================================================
-十九、日期
-==================================================
-
-数据库保存：
-
-ISO 8601 UTC timestamp
-
-
-前端根据用户时区显示。
-
-当前使用：
-
-Asia/Kuala_Lumpur
-
-
-UI：
-
-19 Aug 2026
-18:35
-
-
-数据层：
-
-2026-08-19T10:35:00.000Z
-
-
-==================================================
-二十、API
-==================================================
-
-必须建立 REST API。
-
-
-Expenses：
-
-GET /api/expenses
-
-POST /api/expenses
-
-GET /api/expenses/:id
-
-PUT /api/expenses/:id
-
-DELETE /api/expenses/:id
-
-
-Persons：
-
-GET /api/persons
-
-POST /api/persons
-
-GET /api/persons/:id
-
-PUT /api/persons/:id
-
-DELETE /api/persons/:id
-
-
-Projects：
-
-GET /api/projects
-
-POST /api/projects
-
-PUT /api/projects/:id
-
-DELETE /api/projects/:id
-
-
-Settlements：
-
-GET /api/settlements
-
-POST /api/settlements
-
-GET /api/settlements/:id
-
-PUT /api/settlements/:id
-
-
-Dashboard：
-
-GET /api/dashboard
-
-
-Statistics：
-
-GET /api/statistics
-
-
-Balance：
-
-GET /api/balances
-
-GET /api/balances/:personId
-
-
-Categories：
-
-GET /api/categories
-
-POST /api/categories
-
-PUT /api/categories/:id
-
-DELETE /api/categories/:id
-
-
-==================================================
-二十一、API 返回结构
-==================================================
-
-统一：
-
-成功：
-
-{
-    "success": true,
-    "data": ...
-}
-
-
-错误：
-
-{
-    "success": false,
-    "error": {
-        "code": "...",
-        "message": "..."
-    }
-}
-
-
-不要每个 API 使用不同格式。
-
-
-==================================================
-二十二、API Error Code
-==================================================
-
-至少：
-
-AUTH_REQUIRED
-FORBIDDEN
-VALIDATION_ERROR
-NOT_FOUND
-DUPLICATE
-INVALID_AMOUNT
-INVALID_SPLIT
-INVALID_SETTLEMENT
-BALANCE_ERROR
-DATABASE_ERROR
-INTERNAL_ERROR
-
-
-前端根据 error.code 决定 UI。
-
-
-==================================================
-二十三、前端状态管理
-==================================================
-
-不要让页面到处自己 fetch。
-
-建立：
-
-api.js
-
-负责：
-
-GET
-POST
-PUT
-DELETE
-
-
-state.js
-
-保存：
-
-currentUser
-persons
-expenses
-projects
-categories
-settlements
-dashboard
-filters
-
-
-页面通过 state 获取数据。
-
-
-保存数据之后：
-
-重新获取必要的数据
-
-而不是整个页面 reload。
-
-
-不要使用：
-
-location.reload()
-
-
-作为正常更新方式。
-
-
-==================================================
-二十四、Create / Read / Update / Delete
-==================================================
-
-所有主要数据都需要完整 CRUD。
-
-Expense：
-
-Create
-Read
-Update
-Cancel
-
-
-Person：
-
-Create
-Read
-Update
-Archive
-
-
-Project：
-
-Create
-Read
-Update
-Archive
-
-
-Settlement：
-
-Create
-Read
-
-
-Settlement 默认不能删除。
-
-如果发生错误：
-
-创建 reversal / correction transaction。
-
-这样不会破坏财务历史。
-
-
-==================================================
-二十五、UI 页面结构
-==================================================
-
-
-PAGE 1
-Dashboard
-
-
-必须显示：
-
-Total Advanced
-Settled
-Outstanding
-People Who Owe
-Recent Expenses
-Recent Settlements
-
-
-顶部：
-
-Current Period
-
-例如：
-
-August 2026
-
-
-快速入口：
-
-+ New Advance
-
-
---------------------------------------
-
-PAGE 2
-Expenses
-
-
-显示：
-
-Date
-Description
-Payer
-Amount
-Participants
-Outstanding
-Status
-
-
-支持：
-
-Search
-Filter
-Sort
-Pagination
-
-
-Filter：
-
-Date
-Person
-Project
-Category
-Status
-Amount
-
-
---------------------------------------
-
-PAGE 3
-Expense Detail
-
-
-显示：
-
-Description
-
-RM120
-
-Date
-
-Paid by:
-Lebin
-
-
-Participants：
-
-John
-RM40
-Outstanding
-
-Mary
-RM40
-Settled
-
-Peter
-RM40
-Outstanding
-
-
-Attachments
-
-Notes
-
-
-Actions：
-
-Edit
-Settle
-Cancel
-
-
---------------------------------------
-
-PAGE 4
-People
-
-
-显示：
-
-John
-RM120
-
-
-Mary
-RM80
-
-
-Peter
-RM50
-
-
-按照：
-
-Outstanding DESC
-
-
---------------------------------------
-
-PAGE 5
-Person Detail
-
-
-显示：
-
-John
-
-Net Balance:
-+RM120
-
-
-Summary：
-
-Owes you
-RM150
-
-You owe John
-RM30
-
-Net
-RM120
-
-
-Transaction history。
-
-
---------------------------------------
-
-PAGE 6
-Projects
-
-
-显示：
-
-Travel
-RM1,200
-
-Badminton
-RM400
-
-Dinner
-RM300
-
-
-进入 Project：
-
-Total
-Advanced
-Outstanding
-People
-Expenses
-
-
---------------------------------------
-
-PAGE 7
-Settlements
-
-
-显示：
-
-Date
-From
-To
-Amount
-Method
-Note
-
-
---------------------------------------
-
-PAGE 8
-Statistics
-
-
-显示：
-
-Monthly Advanced
-
-Monthly Settled
-
-Outstanding Trend
-
-Category Breakdown
-
-People Breakdown
-
-Project Breakdown
-
-
-不要一开始做复杂 BI。
-
-
-==================================================
-二十六、Dashboard 数据计算
-==================================================
-
-Dashboard：
-
-Total Advanced
-
-= 当前用户作为 payer 的 Expense total
-
-
-Total Settled
-
-= 与当前用户有关的 Settlement
-
-
-Outstanding
-
-= Balance Engine
-
-
-Do not simply:
-
-Total Advanced - Total Settled
-
-因为可能存在：
-
-别人替你付款
-你替别人付款
-双向债务。
-
-
-必须使用统一 Balance Engine。
-
-
-==================================================
-二十七、搜索系统
-==================================================
-
-支持：
-
-description
-person name
-project
-category
-amount
-
-
-例如：
-
-Search:
-
-John
-
-
-返回：
-
-所有与 John 相关的交易。
-
-
-==================================================
-二十八、筛选系统
-==================================================
-
-支持：
-
-Date Range
-
-Person
-
-Category
-
-Project
-
-Status
-
-Payer
-
-Currency
-
-
-并且筛选条件可以组合。
-
-
-例如：
-
-Person = John
-
-Status = Unsettled
-
-Date = August
-
-
-返回：
-
-John 在 8 月仍未结算的所有金额。
-
-
-==================================================
-二十九、排序
-==================================================
-
-Expenses：
-
-Newest
-Oldest
-Highest Amount
-Lowest Amount
-
-
-People：
-
-Highest Outstanding
-Lowest Outstanding
-Name
-
-
-Projects：
-
-Highest Amount
-Newest
-
-
-==================================================
-三十、分页
-==================================================
-
-不要一次从数据库加载所有历史记录。
-
-Expenses 必须支持：
-
-limit
-offset
-
-或：
-
-cursor pagination
-
-
-默认：
-
-20 / page
-
-
-==================================================
-三十一、数据库 Index
-==================================================
-
-至少建立：
-
-expenses(owner_user_id)
-
-expenses(transaction_date)
-
-expenses(payer_person_id)
-
-expenses(project_id)
-
-expenses(category_id)
-
-expense_participants(expense_id)
-
-expense_participants(person_id)
-
-settlements(owner_user_id)
-
-settlements(from_person_id)
-
-settlements(to_person_id)
-
-persons(owner_user_id)
-
-
-复合 Index：
-
-expenses(owner_user_id, transaction_date)
-
-expense_participants(person_id, expense_id)
-
-
-==================================================
-三十二、数据隔离
-==================================================
-
-非常重要。
-
-每一次数据库查询必须带：
-
-owner_user_id
-
-
-不能：
-
-SELECT * FROM expenses
-
-
-必须：
-
-SELECT *
-FROM expenses
-WHERE owner_user_id = ?
-
-
-防止用户看到其他人的数据。
-
-
-==================================================
-三十三、Authentication
-==================================================
-
-所有 API 除公开接口以外：
-
-必须验证当前 User。
-
-
-API 从 authenticated session / token 得到：
-
-currentUserId
-
-
-禁止前端：
-
-POST owner_user_id
-
-
-然后后端相信这个值。
-
-
-后端永远从认证身份获取 owner_user_id。
-
-
-==================================================
-三十四、Authorization
-==================================================
-
-User：
-
-只能操作自己的：
-
-Persons
-Expenses
-Projects
-Categories
-Settlements
-
-
-Admin：
-
-可以进入 Admin Panel。
-
-但 Admin 在这个 Sub-App 中仍然作为普通 User 使用自己的数据。
-
-
-==================================================
-三十五、前端 UX
-==================================================
-
-设计方向：
-
-Premium Minimal
-
-Minimal
-Modern
-Clean
-Professional
-
-不要：
-
-大量渐变
-大面积阴影
-过多圆角
-卡片堆叠
-花哨动画
-彩色 Dashboard
-传统 ERP 风格
-
-
-应该：
-
-留白
-清晰排版
-微妙边框
-低对比度背景
-精确间距
-高质量 Typography
-
-
-整个 Toolbox 必须保持统一 Design System。
-
-
-==================================================
-三十六、UI Design System
-==================================================
-
-定义 CSS Variables。
-
-例如：
-
---bg
---surface
---surface-hover
---border
---text-primary
---text-secondary
---text-muted
---accent
---success
---warning
---danger
---radius-sm
---radius-md
---radius-lg
---spacing-xs
---spacing-sm
---spacing-md
---spacing-lg
---spacing-xl
-
-
-不要每个页面写不同颜色。
-
-所有页面统一使用 Design Tokens。
-
-
-==================================================
-三十七、响应式
-==================================================
-
-Desktop First
-
-同时支持：
-
-Desktop
-Tablet
-Mobile
-
-
-桌面：
-
-Sidebar
-Main Content
-
-
-Mobile：
-
-Bottom Navigation
-或 Compact Header
-
-
-Expense Detail 必须在手机上也易于查看。
-
-
-==================================================
-三十八、Loading 状态
-==================================================
-
-每个 async operation 都必须有：
-
-Loading
-
-不能：
-
-点击 Save
-然后页面毫无反馈。
-
-
-Button：
-
-Saving...
-
-
-列表：
-
-Skeleton / Loading indicator
-
-
-==================================================
-三十九、Empty State
-==================================================
-
-如果没有 Expense：
-
-不要：
-
-“No data”
-
-
-应该：
-
-No advances yet.
-
-Start tracking your first advance.
-
+```text
+logo_url
+```
 
 并提供：
 
-+ New Advance
+* 上传/输入 Logo
+* 图片预览
+* 删除 Logo
+* 默认 Logo
+* 产品没有 Logo 时继承 Platform Logo
 
+不要把大量图片直接塞进 SQLite/D1。
 
-==================================================
-四十、Error State
-==================================================
+---
 
-API 出错：
+# 五、Product 管理
 
-显示：
-
-Unable to load data.
-
-Retry
-
-
-Save 出错：
-
-显示：
-
-Unable to save this advance.
-
-
-不要直接：
-
-console.error
-
-
-然后什么都不告诉用户。
-
-
-==================================================
-四十一、Toast
-==================================================
-
-成功：
-
-Advance saved
-
-
-Settlement recorded
-
-
-更新：
-
-Expense updated
-
-
-失败：
-
-Unable to save
-
-
-Toast 必须统一组件。
-
-
-==================================================
-四十二、Confirm Dialog
-==================================================
-
-取消 Expense：
-
-必须确认。
-
+这是你的第二层。
 
 例如：
 
-Cancel this advance?
-
-This action will keep the transaction in your history as cancelled.
-
-
-不要直接删除。
-
-
-==================================================
-四十三、Optimistic Update
-==================================================
-
-第一阶段：
-
-不要为了性能过早做 optimistic update。
-
-
-优先：
-
-API success
-↓
-Update state
-↓
-Update UI
-
-
-确保数据正确以后再优化。
-
-
-==================================================
-四十四、Concurrency
-==================================================
-
-同一数据同时更新时：
-
-后端必须重新验证。
-
-
-例如：
-
-两次 settlement 同时提交。
-
-
-不能出现：
-
-Outstanding = -RM50
-
-
-提交 Settlement 前：
-
-重新查询 Balance。
-
-
-如果：
-
-settlement > outstanding
-
-
-拒绝。
-
-
-==================================================
-四十五、事务
-==================================================
-
-创建 Expense：
-
-必须使用 Database Transaction。
-
-
-步骤：
-
-Create expense
-
-Create participants
-
-Create attachments
-
-Create audit log
-
-
-任何一步失败：
-
-全部 rollback。
-
-
-Settlement 同理：
-
-Create settlement
-
-Update / calculate related state
-
-Create audit log
-
-
-必须保持一致性。
-
-
-==================================================
-四十六、不要存储可推导数据
-==================================================
-
-以下数据原则上不要当成唯一真相长期存储：
-
-balance_amount
-outstanding
-person_total
-
-
-这些可以由：
-
-Expenses
-Participants
-Settlements
-
-
-计算得到。
-
-
-如果为了性能做 cache：
-
-必须明确：
-
-Source of Truth = Transaction Tables
-
-
-不能让：
-
-balance column
-
-成为错误数据的来源。
-
-
-==================================================
-四十七、Source of Truth
-==================================================
-
-Source of Truth：
-
-expenses
-expense_participants
-settlements
-
-
-Dashboard：
-
-derived data
-
-
-Statistics：
-
-derived data
-
-
-Person Balance：
-
-derived data
-
-
-UI：
-
-derived state
-
-
-绝对不要：
-
-“前端算完直接存数据库作为真实余额”。
-
-
-==================================================
-四十八、数据导入
-==================================================
-
-以后需要支持：
-
-CSV Import
-
-
-CSV 至少支持：
-
-date
-description
-amount
-payer
-participants
-category
-project
-note
-
-
-但是第一阶段可以暂时不实现 UI。
-
-数据库架构必须允许以后扩展。
-
-
-==================================================
-四十九、数据导出
-==================================================
-
-以后支持：
-
-CSV
-
-JSON
-
-
-导出包括：
-
-Expenses
-Participants
-Settlements
-
-
-最好支持：
-
-Export All Data
-
-
-==================================================
-五十、Backup
-==================================================
-
-以后支持：
-
-Full Backup
-
-格式：
-
-JSON
-
-
-必须可以：
-
-Export
-Import
-
-
-目标：
-
-用户换数据库时仍然可以恢复数据。
-
-
-==================================================
-五十一、Audit
-==================================================
-
-所有重要 mutation：
-
-Create Expense
-Update Expense
-Cancel Expense
-Create Settlement
-Update Person
-Archive Person
-
-
-必须写 Audit Log。
-
-
-old_data / new_data：
-
-可以保存 JSON。
-
-
-==================================================
-五十二、金额显示
-==================================================
-
-MYR：
-
-RM 120.00
-
-
-金额必须统一 formatter。
-
-
-不要页面 A：
-
-RM120
-
-
-页面 B：
-
-120.00
-
-
-页面 C：
-
-MYR 120
-
-
-必须统一。
-
-
-==================================================
-五十三、日期显示
-==================================================
-
-统一：
-
-19 Aug 2026
-
-
-详细页面：
-
-19 Aug 2026, 18:30
-
-
-数据库：
-
-ISO UTC
-
-
-==================================================
-五十四、Dashboard 交互
-==================================================
-
-Outstanding 数字可以点击。
-
-点击：
-
-RM460
-
-
-跳到：
-
-Expenses / People
-
-并自动设置：
-
-Status = Unsettled
-
-
-点击：
-
-John RM120
-
-
-直接：
-
-Person Detail → John
-
-
-==================================================
-五十五、Notification
-==================================================
-
-第一阶段不需要推送通知。
-
-但数据库设计应该允许以后加入：
-
-Reminder
-
-例如：
-
-John owes RM120
-
-
-Reminder date：
-
-25 Aug
-
-
-未来可以实现。
-
-
-==================================================
-五十六、未来扩展
-==================================================
-
-架构必须允许：
-
-Recurring expense
-Debt reminder
-Multi-currency
-Currency conversion
-Bank import
-Receipt OCR
-Cloudflare R2
-CSV import/export
-JSON backup
-Scheduled reminders
-Reports
-PDF export
-
-
-但：
-
-现在不要为了未来功能把 MVP 搞复杂。
-
-
-==================================================
-五十七、MVP
-==================================================
-
-第一阶段必须完成：
-
-Database
-
-Authentication integration
-
-Persons
-
-Expenses
-
-Participants
-
-Equal split
-
-Fixed split
-
-Percentage split
-
-Balance Engine
-
-Dashboard
-
-Expense Detail
-
-Person Detail
-
-Settlements
-
-Partial Settlement
-
-Search
-
-Filter
-
-CRUD
-
-Audit Logs
-
-Responsive UI
-
-
-==================================================
-五十八、Phase 2
-==================================================
-
-完成：
-
-Projects
-
-Categories
-
-Attachments
-
-Statistics
-
-Charts
-
-CSV Export
-
-JSON Backup
-
-
-==================================================
-五十九、Phase 3
-==================================================
-
-未来：
-
-Reminders
-
-OCR
-
-Recurring
-
-Import
-
-Advanced analytics
-
-Multi-currency
-
-Debt optimization
-
-
-==================================================
-六十、开发规范
-==================================================
-
-不要一次生成一个巨大 HTML。
-
-必须模块化。
-
-
-不要：
-
-10000 行 script.js
-
-
-应该：
-
-多个 JS modules。
-
-
-CSS 也模块化：
-
-variables
-base
-layout
-components
-pages
-responsive
-
-
-HTML：
-
-layout
-components
-page containers
-
-
-==================================================
-六十一、不要硬编码
-==================================================
-
-不要硬编码：
-
-User ID
-Person ID
-Category ID
-Project ID
-Balance
-Total
+```text
+Hong Leong Bank
+│
+├── Savings
+├── Fixed Deposit
+└── Current Account
+```
+
+Product 应包含：
+
+```text
+Name
+Platform
+Product Type
 Currency
-Date
+Logo
+Target Allocation
+Active / Inactive
+Notes
+Display Order
+```
+
+例如：
+
+| Platform   | Product       | Type         | Currency | Target |
+| ---------- | ------------- | ------------ | -------- | -----: |
+| Hong Leong | Savings       | Cash         | MYR      |    15% |
+| Hong Leong | Fixed Deposit | Fixed Income | MYR      |    10% |
+| IBKR       | Cash          | Cash         | USD      |    20% |
+
+### Product Type
+
+建议预设：
+
+```text
+Cash
+Savings
+Fixed Deposit
+Investment
+Brokerage
+E-Wallet
+Other
+```
+
+但要允许自定义。
+
+---
+
+# 六、Monthly Snapshot —— 核心数据入口
+
+你每个月不需要重新创建产品。
+
+例如选择：
+
+```text
+August 2026
+```
+
+系统自动显示：
+
+```text
+Monthly Balance — August 2026
+
+Hong Leong Bank
+────────────────────────────────
+
+Savings
+Previous: RM 8,500
+Current:  [ RM 9,200 ]
+
+Fixed Deposit
+Previous: RM 20,000
+Current:  [ RM 20,000 ]
 
 
-所有数据从：
+Maybank
+────────────────────────────────
 
-API
-State
-Database
+Savings
+Previous: RM 5,200
+Current:  [ RM 5,800 ]
+```
 
+最后：
 
-获取。
+```text
+Total
+RM 35,000
+```
 
+---
 
-==================================================
-六十二、表单验证
-==================================================
+# 七、非常建议加入「复制上个月」
 
-前端验证：
+这是 Vibe Coding 项目里非常值得做的 UX。
 
-Amount > 0
+按钮：
 
-Description required
+```text
+[ Copy Previous Month ]
+```
 
-Participants >= 1
+例如：
 
-Fixed split total = Expense total
+```text
+July
 
-Percentage total = 100
+Savings       8,500
+FD            20,000
+IBKR          35,000
+```
 
-Settlement amount > 0
+进入 August 后：
 
-Settlement amount <= outstanding
+```text
+Copy July Data
+```
 
-Date valid
+自动：
 
+```text
+Savings       8,500
+FD            20,000
+IBKR          35,000
+```
 
-但：
+你只修改变化的数字。
 
-前端验证只是 UX。
+这样每月输入会非常快。
 
-后端必须再次验证全部规则。
+---
 
+# 八、不要把“没有数据”当成 RM 0
 
-==================================================
-六十三、安全
-==================================================
+这是数据逻辑里很重要的一条。
+
+例如：
+
+```text
+July
+Hong Leong Savings = RM 5,000
+```
+
+August 没输入。
+
+不能自动理解：
+
+```text
+RM 0
+```
+
+因为：
+
+> 没有记录 ≠ 余额为 0
+
+应该显示：
+
+```text
+Not Reported
+```
+
+只有用户明确输入：
+
+```text
+0
+```
+
+才代表：
+
+```text
+RM 0
+```
+
+---
+
+# 九、货币设计
+
+即使现在主要使用 MYR，也建议数据库一开始支持：
+
+```text
+MYR
+USD
+SGD
+HKD
+EUR
+GBP
+JPY
+...
+```
+
+每条月度余额保存：
+
+```text
+native_amount
+currency
+fx_rate_to_base
+base_amount
+```
+
+例如：
+
+```text
+IBKR Cash
+
+Native:
+USD 5,000
+
+FX:
+1 USD = RM 4.25
+
+Base:
+RM 21,250
+```
+
+### 为什么 FX 必须记录在月度快照里？
+
+因为：
+
+```text
+January
+USD 1 = RM 4.60
+
+August
+USD 1 = RM 4.25
+```
+
+如果你每次查看历史数据都用“今天的汇率”，过去的资产曲线会不断变化。
+
+正确方式是：
+
+```text
+2026-01
+USD 5,000
+FX 4.60
+= RM 23,000
+
+2026-08
+USD 5,000
+FX 4.25
+= RM 21,250
+```
+
+因此历史数据不会被当前汇率重新计算。
+
+第一版可以**手动输入 FX**。
+
+未来再增加：
+
+```text
+Auto FX
+```
+
+---
+
+# 十、资产配置统计
+
+这是你这个 Sub-App 的核心价值之一。
+
+## Platform Allocation
+
+例如：
+
+```text
+Total Assets
+RM 100,000
+
+Hong Leong
+RM 40,000
+40%
+
+Maybank
+RM 20,000
+20%
+
+IBKR
+RM 30,000
+30%
+
+Others
+RM 10,000
+10%
+```
+
+公式：
+
+```text
+Platform Allocation %
+=
+Platform Total / Total Assets × 100
+```
+
+---
+
+# 十一、Product Allocation
+
+进一步：
+
+```text
+Hong Leong
+RM 40,000
+
+Savings          RM 15,000
+Fixed Deposit    RM 25,000
+```
+
+占全部资产：
+
+```text
+Savings        15%
+Fixed Deposit  25%
+```
+
+占 Hong Leong：
+
+```text
+Savings        37.5%
+Fixed Deposit  62.5%
+```
+
+这两个维度都建议提供。
+
+---
+
+# 十二、Target Allocation
+
+为了真正帮助你做资产分配，我建议增加：
+
+```text
+Target Allocation %
+```
+
+例如：
+
+| Platform   | Actual | Target | Difference |
+| ---------- | -----: | -----: | ---------: |
+| Hong Leong |    40% |    30% |       +10% |
+| Maybank    |    20% |    25% |        -5% |
+| IBKR       |    30% |    35% |        -5% |
+| Others     |    10% |    10% |         0% |
+
+显示：
+
+```text
+Hong Leong
+Actual   40%
+Target   30%
++10%
+```
+
+这样你不是单纯看数据，而是可以直接判断：
+
+> 哪个平台资金太多 / 太少。
+
+---
+
+# 十三、必须具备的图表
+
+## ① Total Asset Curve
+
+最重要。
+
+```text
+X = Month
+Y = Total Assets
+```
+
+例如：
+
+```text
+Jan  80k
+Feb  84k
+Mar  91k
+Apr  89k
+May  96k
+Jun  102k
+```
+
+---
+
+## ② Platform Balance Trend
+
+多条曲线：
+
+```text
+Hong Leong
+Maybank
+IBKR
+Others
+```
+
+X：
+
+```text
+Month
+```
+
+Y：
+
+```text
+Amount
+```
+
+用来观察：
+
+> 哪个平台的钱在增长。
+
+---
+
+## ③ Platform Allocation
+
+当前月份：
+
+```text
+Hong Leong    35%
+Maybank       25%
+IBKR          30%
+Others        10%
+```
+
+可以使用 Donut/Pie。
+
+---
+
+## ④ Allocation Over Time
+
+这个比单纯 Pie 更有价值。
+
+例如：
+
+```text
+        HLB  Maybank  IBKR
+Jan     40%   30%     30%
+Feb     38%   31%     31%
+Mar     35%   30%     35%
+Apr     33%   28%     39%
+```
+
+可以做 Stacked Area/100% stacked chart。
+
+让你看到：
+
+> 我的资产配置结构有没有发生变化。
+
+---
+
+## ⑤ Monthly Change
+
+```text
+Jan → Feb     +5,000
+Feb → Mar     +7,000
+Mar → Apr     -2,000
+```
+
+Bar Chart。
+
+---
+
+## ⑥ Platform Monthly Comparison Table
+
+这个是你明确需要的。
+
+```text
+Platform      Jan      Feb      Mar      Apr      May
+---------------------------------------------------------
+Hong Leong    20,000   22,000   21,500   25,000   27,000
+Maybank       15,000   16,000   17,000   18,000   18,500
+IBKR          30,000   31,500   35,000   34,000   38,000
+Others        5,000    5,500    6,000    6,500    7,000
+---------------------------------------------------------
+Total         70,000   75,000   79,500   83,500   90,500
+```
+
+并支持：
+
+* 横向滚动
+* Sticky first column
+* 月份筛选
+* Platform 展开
+* Product 子行
+
+例如：
+
+```text
+Hong Leong       RM 42,500
+  ├─ Savings     RM 12,500
+  └─ FD          RM 30,000
+```
+
+---
+
+# 十四、建议的数据库结构
+
+如果你目前已经有 Users/Auth，**不要重复建立用户系统**。
+
+建议这个 Sub-App 最核心的表：
+
+```text
+financial_platforms
+financial_products
+financial_periods
+financial_snapshots
+```
+
+### financial_platforms
+
+```text
+id
+user_id
+name
+logo_url
+description
+is_active
+sort_order
+created_at
+updated_at
+```
+
+### financial_products
+
+```text
+id
+user_id
+platform_id
+name
+product_type
+currency
+logo_url
+target_allocation_pct
+is_active
+sort_order
+notes
+created_at
+updated_at
+```
+
+### financial_periods
+
+```text
+id
+user_id
+month_key
+status
+notes
+created_at
+updated_at
+```
+
+例如：
+
+```text
+2026-01
+2026-02
+2026-03
+```
+
+### financial_snapshots
+
+```text
+id
+user_id
+period_id
+product_id
+
+native_amount
+currency
+fx_rate_to_base
+base_amount
+
+notes
+created_at
+updated_at
+```
+
+最重要的约束：
+
+```text
+UNIQUE(period_id, product_id)
+```
+
+同一个月、同一个 Product 只能存在一条余额记录。
+
+Cloudflare D1 使用 SQLite 语义，并支持 foreign keys；这种 `platform → product → snapshot` 的关系适合用 FK 来保证数据完整性。([Cloudflare Docs][1])
+
+常用查询字段，例如 `user_id`、`platform_id`、`product_id`、`month_key`，应根据实际查询方式建立索引，以减少 D1 扫描数据量。([Cloudflare Docs][2])
+
+---
+
+# 十五、页面结构
+
+我建议第三个 Sub-App 做成：
+
+```text
+Financial Overview
+│
+├── Dashboard
+│
+├── Monthly Data
+│
+├── Platforms
+│
+├── Products
+│
+└── Analytics
+```
+
+### Dashboard
+
+```text
+Total Assets
+Monthly Change
+Allocation
+Asset Curve
+Platform Distribution
+```
+
+### Monthly Data
+
+负责输入：
+
+```text
+January
+February
+March
+...
+```
+
+### Platforms
+
+管理：
+
+```text
+Hong Leong
+Maybank
+IBKR
+...
+```
+
+### Products
+
+管理：
+
+```text
+Savings
+Fixed Deposit
+Cash
+...
+```
+
+### Analytics
+
+专门看：
+
+```text
+Historical Trend
+Platform Comparison
+Allocation
+Monthly Change
+Target vs Actual
+```
+
+---
+
+# 十六、推荐的操作流程
+
+你的实际使用应该尽量简单：
+
+```text
+第一次使用
+      ↓
+建立 Platform
+      ↓
+建立 Product
+      ↓
+输入当前月份资金
+      ↓
+Dashboard 自动统计
+```
+
+下个月：
+
+```text
+打开 Monthly Data
+      ↓
+选择 August
+      ↓
+Copy July
+      ↓
+修改变化的数据
+      ↓
+Save
+      ↓
+Dashboard 自动更新
+```
+
+你不应该每个月重新建立：
+
+```text
+Hong Leong
+Savings
+```
+
+这些都是长期存在的 Master Data。
+
+每个月只新增：
+
+```text
+Snapshot
+```
+
+---
+
+# 十七、以后可以扩展的功能
+
+第一版不要全部做。
+
+但数据库设计应该预留：
+
+```text
+Target Allocation
+Notes
+FX
+Product Type
+Account Identifier
+Interest Rate
+Maturity Date
+```
+
+未来可以做：
+
+```text
+FD Maturity Tracking
+Interest Income
+Investment Portfolio
+Net Worth
+Asset Class
+Monthly Contribution
+Monthly Withdrawal
+Rebalancing Recommendation
+```
+
+也就是说以后这个 Sub-App 可以慢慢进化成：
+
+> **Personal Wealth Dashboard**
+
+---
+
+# 十八、对 Vibe Coding 最重要的实现策略
+
+不要让 Agent：
+
+> “重新做一个财务系统。”
+
+而应该告诉它：
+
+```text
+你是在我现有系统里面增加第三个 Sub-App。
+不要破坏已有 Sub-App。
+不要重新建立 Authentication。
+不要重新建立 Admin。
+复用现有 Design System。
+复用现有 Database Layer。
+复用现有 API Pattern。
+复用现有 User/Role 权限体系。
+```
+
+这样 AI 不容易把你的整个项目越改越乱。
+
+---
+
+下面这一整套可以**直接复制给 Antigravity / 你的 AI Agent**。
+
+# 第三个 Sub-App：Monthly Financial Overview
+
+## 任务
+
+在当前已有项目中，新增第三个 Sub-App：
+
+**Monthly Financial Overview / 月度财务统计**
+
+这个 Sub-App 的核心目标不是传统记账，而是：
+
+> 统一记录我分散在不同平台、不同金融产品中的资金，并通过月度历史快照统计总资产、平台分配、产品分配、月度变化和资金曲线，帮助我进行资产配置管理。
+
+这是一个长期使用的个人资产统计系统。
+
+---
+
+# 0. 非常重要：先审计，不要直接重写
+
+在开始任何代码修改之前，先完整检查当前项目：
+
+```text
+1. Project structure
+2. Existing Sub-Apps
+3. Existing routing
+4. Existing authentication
+5. Existing users table
+6. Existing role/admin system
+7. Existing API architecture
+8. Existing database architecture
+9. Existing D1 binding
+10. Existing SQLite/D1 migrations
+11. Existing UI design system
+12. Existing components
+13. Existing chart library
+14. Existing deployment configuration
+15. Existing documentation
+```
+
+特别检查：
+
+```text
+docs/ARCHITECTURE.md
+docs/DATABASE.md
+docs/API.md
+AGENTS.md
+```
+
+如果这些文件不存在，先分析当前项目后再建立。
+
+---
+
+# 1. 不允许破坏现有系统
+
+这是新增 Sub-App，不是重写项目。
 
 必须：
 
-Parameterized SQL
+```text
+Preserve existing features.
+Preserve existing Sub-Apps.
+Preserve existing authentication.
+Preserve existing admin system.
+Preserve existing routing.
+Preserve existing database data.
+Preserve existing API behavior.
+Preserve existing UI patterns.
+```
 
-Input validation
+禁止：
 
-Output escaping
+```text
+重新建立 Authentication
+重新建立 User System
+重新建立 Admin System
+重新建立完全不同的 Design System
+随意修改旧数据库 migration
+重写整个项目
+删除现有功能
+```
 
-Authorization
+如果需要修改现有基础架构，使用最小改动。
 
-Authentication
+---
 
-CORS policy
+# 2. 复用现有 Authentication
 
-CSRF strategy（如适用）
+当前系统已经存在 User/Admin 体系。
 
-Rate limiting（API 层以后加入）
+这个 Sub-App 不应该建立第二套用户系统。
 
-不要：
+必须使用当前登录用户。
 
-SQL string concatenation
+数据必须按照：
 
+```text
+user_id
+```
 
-==================================================
-六十四、API 不允许直接暴露数据库错误
-==================================================
+进行隔离。
 
-数据库错误：
+普通 User：
 
-不能直接返回：
-
-SQLite error stack
-
-
-前端只收到：
-
-DATABASE_ERROR
-
-
-详细信息仅写：
-
-server logs
-
-
-==================================================
-六十五、开发前必须做的事情
-==================================================
-
-在开始写代码以前：
-
-第一：
-
-检查现有项目结构。
-
-第二：
-
-检查现有：
-
-HTML
-CSS
-JS
-Cloudflare Worker
-D1 / SQLite schema
-Authentication
-Routing
-
-
-第三：
-
-不要破坏已有 Sub-App。
-
-这个 Sub-App 必须作为独立模块加入 Toolbox。
-
-
-第四：
-
-分析现有 Design System。
-
-如果已有：
-
-CSS variables
-buttons
-modal
-sidebar
-toast
-
-
-优先复用。
-
-不要重新造一套。
-
-
-==================================================
-六十六、必须先输出开发计划
-==================================================
-
-在真正修改代码以前，请先给我：
-
-1. 当前项目结构分析
-2. 建议的新目录结构
-3. Database ERD
-4. 完整 SQL schema
-5. API endpoint list
-6. Business logic
-7. Balance calculation algorithm
-8. Page structure
-9. Component structure
-10. Frontend state structure
-11. Security considerations
-12. Implementation order
-13. Migration strategy
-14. Test cases
-
-
-然后再开始实现。
-
-
-==================================================
-六十七、数据库 Migration
-==================================================
-
-不要直接覆盖现有数据库。
-
-
-如果数据库已经存在：
-
-建立 migration：
-
-001_create_persons.sql
-002_create_categories.sql
-003_create_projects.sql
-004_create_expenses.sql
-005_create_expense_participants.sql
-006_create_settlements.sql
-007_create_attachments.sql
-008_create_audit_logs.sql
-
-
-以后：
-
-009_xxx.sql
-
-
-不要修改已经执行过的 migration。
-
-
-==================================================
-六十八、Test
-==================================================
-
-至少测试以下情况：
-
-
-TEST 1
-
-Lebin 支付 RM120
-
-John / Mary / Peter 平分。
-
-结果：
-
-John owes RM40
-Mary owes RM40
-Peter owes RM40
-
-
-TEST 2
-
-John 支付 RM100
-
-Lebin / John / Mary 平分。
-
-结果：
-
-Lebin owes John
-Mary owes John
-
-
-TEST 3
-
-RM100
-
-John 50
-Mary 30
-Peter 20
-
-
-TEST 4
-
-John owes RM100
-
-settlement RM30
-
-remaining RM70
-
-
-TEST 5
-
-John owes RM100
-
-settlement RM100
-
-remaining RM0
-
-
-TEST 6
-
-John owes RM100
-
-attempt settlement RM120
-
-必须拒绝。
-
-
-TEST 7
-
-You owe John RM50
-
-John owes you RM80
-
-Net:
-
-John owes you RM30
-
-
-TEST 8
-
-同时两个 settlement。
-
-不能产生负余额。
-
-
-TEST 9
-
-取消 Expense。
-
-Dashboard 不再计算该 Expense。
-
-
-TEST 10
-
-User A 不能读取 User B 的 Expense。
-
-
-TEST 11
+```text
+只能访问自己的 Financial Overview 数据。
+```
 
 Admin：
 
-可以正常使用普通 User 功能。
+```text
+可以正常作为自己的 User 使用 Financial Overview。
 
-同时：
+同时如果当前 Admin 权限体系允许，可以从现有 Admin 系统管理其他用户。
+```
 
-可以进入 Admin Panel。
+不要建立新的 Admin Login。
 
+---
 
-TEST 12
+# 3. Sub-App 定义
 
-Amount：
+建立：
 
-RM10.50
+```text
+Monthly Financial Overview
+```
 
-数据库：
+如果项目已有 Sub-App navigation，请把它作为：
 
-1050
+```text
+Sub-App #3
+```
 
+加入现有导航。
 
-==================================================
-六十九、特别重要：Balance Engine 设计
-==================================================
+不要破坏前两个 Sub-App。
 
-先建立一个明确的数据计算规则。
+---
 
-不要在 UI 里面直接计算。
+# 4. 核心数据层级
 
+采用以下模型：
 
-逻辑应该抽象成：
+```text
+User
+ │
+ └── Financial Platforms
+        │
+        ├── Product
+        │
+        ├── Product
+        │
+        └── Product
+              │
+              ├── Monthly Snapshot
+              ├── Monthly Snapshot
+              └── Monthly Snapshot
+```
 
-getExpensePosition(expense)
+概念必须区分：
 
-getPersonPosition(personId)
+## Platform
 
-getPersonNetBalance(personId)
+资金所属的平台/机构。
 
-getUserOutstanding()
+例如：
 
-getProjectBalance(projectId)
+```text
+Hong Leong Bank
+Maybank
+CIMB
+Interactive Brokers
+Touch 'n Go
+```
 
+## Product
 
-算法基本原则：
+平台里面具体的金融产品。
 
-Expense：
+例如：
 
-Payer contributes positive paid amount。
+```text
+Hong Leong Bank
+├── Savings
+├── Fixed Deposit
+└── Current Account
+```
 
-Participant gets assigned liability share。
+## Monthly Snapshot
 
-Settlement：
+某一个 Product 在某一个月份的月度余额。
 
-From Person decreases their debt。
+例如：
 
-To Person increases received amount。
+```text
+Hong Leong Savings
 
+2026-01 → RM 5,000
+2026-02 → RM 5,500
+2026-03 → RM 6,200
+```
 
-最终：
+---
 
-Net Balance = Total Amount Others Owe Me
-             - Total Amount I Owe Others
+# 5. 关键业务原则：历史数据必须独立保存
 
+绝对不要只设计：
 
-根据正负：
+```text
+product.current_balance
+```
 
-> 0
-别人净欠我
+然后尝试推算历史。
 
+必须使用：
 
-< 0
-我净欠别人
+```text
+Product
++
+Monthly Snapshot
+```
 
+因为系统必须支持：
 
-= 0
-Settled
+```text
+过去任意月份的资产统计
+历史资金曲线
+历史平台比较
+历史资产占比
+Month-over-Month Change
+```
 
+---
 
-==================================================
-七十、最终验收标准
-==================================================
+# 6. Database Schema
 
-只有满足以下条件才算完成：
+根据现有数据库命名规范创建。
 
-[ ] Database schema complete
-[ ] Migration complete
-[ ] API complete
-[ ] Authentication integrated
-[ ] Authorization complete
-[ ] Expense CRUD
-[ ] Person CRUD
-[ ] Project CRUD
-[ ] Category CRUD
-[ ] Participant management
-[ ] Equal split
-[ ] Fixed split
-[ ] Percentage split
-[ ] Settlement
-[ ] Partial settlement
-[ ] Balance Engine
-[ ] Dashboard
-[ ] Expense Detail
-[ ] Person Detail
-[ ] Search
-[ ] Filter
-[ ] Pagination
-[ ] Audit Log
-[ ] Loading states
-[ ] Empty states
-[ ] Error handling
-[ ] Toast
-[ ] Confirm dialogs
-[ ] Responsive
-[ ] Security validation
-[ ] Transaction handling
-[ ] Test cases pass
+建议核心表：
 
+```text
+financial_platforms
+financial_products
+financial_periods
+financial_snapshots
+```
 
-==================================================
-七十一、最重要的 Agent 工作规则
-==================================================
+如果项目已有统一 `users`，不要重新建立用户表。
 
-不要自作主张修改架构。
+---
 
-不要为了“快速完成”把所有东西塞到一个文件。
+# 7. financial_platforms
 
-不要为了“简单”删除数据库关系。
+建议字段：
 
-不要把人物直接保存为字符串。
+```text
+id
+user_id
+name
+logo_url
+description
+is_active
+sort_order
+created_at
+updated_at
+```
 
-不要把 participants 保存成：
+用途：
 
-"John, Mary, Peter"
+保存平台信息。
 
-必须使用关系表。
+例如：
 
+```text
+Hong Leong Bank
+```
 
-不要把余额作为唯一 source of truth。
+支持：
 
-不要用 FLOAT 保存金额。
+* Name
+* Logo
+* Description
+* Active / Inactive
+* Sort Order
 
-不要用前端计算结果作为数据库最终结果。
+Logo 以 URL/reference 为主。
 
-不要用 location.reload() 作为正常数据刷新方式。
+不要把大型图片 Blob 随意直接存进 D1。
 
-不要通过删除交易模拟结算。
+如果当前项目已有文件上传系统，复用现有系统。
 
-不要在已有 Settlement 的情况下无条件修改 Expense 金额。
+---
 
-不要绕过 API 直接连接数据库。
+# 8. financial_products
 
-不要破坏 Toolbox 现有 Sub-App。
+建议字段：
 
-不要重新设计整个 Toolbox 的公共 UI，除非确实需要修改共享 Design System。
+```text
+id
+user_id
+platform_id
+name
+product_type
+currency
+logo_url
+target_allocation_pct
+is_active
+sort_order
+notes
+created_at
+updated_at
+```
 
+例如：
 
-==================================================
-七十二、实现方式
-==================================================
+```text
+Platform:
+Hong Leong Bank
 
-你的工作顺序：
+Product:
+Savings
 
-PHASE 0
-检查现有项目。
+Product Type:
+Savings
 
-PHASE 1
-设计和 migration Database。
+Currency:
+MYR
 
-PHASE 2
-实现 Repository / Data Access。
+Target Allocation:
+15%
+```
 
-PHASE 3
-实现 Balance Engine。
+---
 
-PHASE 4
-实现 API。
+# 9. Product Type
 
-PHASE 5
-实现 Validation。
+第一版提供：
 
-PHASE 6
-实现 Frontend State。
+```text
+Cash
+Savings
+Fixed Deposit
+Investment
+Brokerage
+E-Wallet
+Other
+```
 
-PHASE 7
-实现 Dashboard。
+但是不要硬编码到无法扩展。
 
-PHASE 8
-实现 Expenses。
+应该允许未来增加新的 Product Type。
 
-PHASE 9
-实现 Persons。
+---
 
-PHASE 10
-实现 Settlements。
+# 10. Logo
 
-PHASE 11
-实现 Projects / Categories。
+Platform 必须支持 Logo。
 
-PHASE 12
-Statistics。
+Product 可以：
 
-PHASE 13
-Audit / Error Handling。
+```text
+Own Logo
+```
 
-PHASE 14
-Responsive / UI polish。
+也可以：
 
-PHASE 15
-Testing。
+```text
+Inherit Platform Logo
+```
 
+推荐显示逻辑：
 
-每个阶段完成以后：
+```text
+Product Logo exists
+    ↓
+Use Product Logo
 
-检查代码。
+否则
+    ↓
+Use Platform Logo
 
-检查数据库。
+否则
+    ↓
+Use default icon
+```
 
-检查 API。
+---
 
-运行测试。
+# 11. Currency
 
-确认没有破坏已有功能。
+系统必须支持多币种。
 
+每个 Product 指定：
 
-==================================================
-七十三、最终产品定位
-==================================================
+```text
+currency
+```
 
-这个 Sub-App 最终应该让用户感觉：
+例如：
 
-“我不需要记住谁欠我多少钱，系统会帮我自动算。”
+```text
+MYR
+USD
+SGD
+HKD
+EUR
+```
 
-而不是：
+不要假设所有资产都是 MYR。
 
-“这是一个复杂的财务软件。”
+---
 
+# 12. Base Currency
 
-用户输入：
+系统需要一个统一统计币种。
 
-金额
-事情
-人物
+默认可以：
 
-系统负责：
+```text
+MYR
+```
 
-分摊
-关系
-余额
-结算
-历史
-统计
+但必须通过 Settings 可调整。
 
+例如：
 
-UI 必须极简。
+```text
+Base Currency: MYR
+```
 
-内部架构必须严谨。
+所有 Dashboard 的总资产和图表默认以 Base Currency 统计。
 
+---
 
-==================================================
-七十四、最终要求
-==================================================
+# 13. financial_periods
 
-现在不要马上开始疯狂生成 UI。
+建议：
 
-首先：
+```text
+id
+user_id
+month_key
+status
+notes
+created_at
+updated_at
+```
 
-1. 检查现有项目
-2. 分析现有架构
-3. 分析已有数据库
-4. 分析已有 Authentication
-5. 分析已有 API
-6. 分析已有 Design System
-7. 输出完整实施方案
-8. 输出 ERD
-9. 输出 SQL Migration
-10. 输出 API Contract
-11. 输出 Balance Engine 逻辑
-12. 输出文件结构
+month_key 采用：
 
-确认架构不会破坏已有系统之后，再开始逐阶段实现。
+```text
+YYYY-MM
+```
 
+例如：
 
-最重要：
+```text
+2026-01
+2026-02
+2026-03
+```
 
-宁可先建立正确的数据模型，也不要先做漂亮 UI。
+必须建立唯一约束：
 
-最终目标：
+```text
+UNIQUE(user_id, month_key)
+```
 
-建立一个可靠、可扩展、可审计、数据一致、UI 极简的“垫付 / 往来账管理系统”。
+---
+
+# 14. financial_snapshots
+
+建议：
+
+```text
+id
+user_id
+period_id
+product_id
+
+native_amount
+currency
+fx_rate_to_base
+base_amount
+
+notes
+
+created_at
+updated_at
+```
+
+核心约束：
+
+```text
+UNIQUE(period_id, product_id)
+```
+
+含义：
+
+一个 Product 在同一个月份只能有一个 Snapshot。
+
+---
+
+# 15. FX 处理
+
+如果：
+
+```text
+currency = Base Currency
+```
+
+则：
+
+```text
+fx_rate_to_base = 1
+```
+
+例如：
+
+```text
+USD 5,000
+FX = 4.25
+Base = MYR
+
+base_amount = RM 21,250
+```
+
+必须保存当月使用的：
+
+```text
+fx_rate_to_base
+```
+
+不要每次查看历史数据时使用今天的 FX 重新计算历史资产。
+
+第一版：
+
+```text
+Manual FX Input
+```
+
+即可。
+
+未来再考虑自动 FX API。
+
+---
+
+# 16. Missing Data 规则
+
+非常重要：
+
+```text
+No snapshot
+≠
+Zero balance
+```
+
+如果某个 Product 没有输入该月份数据：
+
+显示：
+
+```text
+Not Reported
+```
+
+不要自动变成：
+
+```text
+RM 0
+```
+
+只有用户明确输入：
+
+```text
+0
+```
+
+才表示该月余额为零。
+
+---
+
+# 17. Dashboard
+
+建立：
+
+```text
+/financial
+```
+
+或者按照当前项目路由规范命名。
+
+Dashboard 必须提供：
+
+## Total Assets
+
+例如：
+
+```text
+Total Assets
+
+RM 128,520.00
+```
+
+---
+
+## Monthly Change
+
+```text
++RM 5,240.00
++4.24%
+vs previous month
+```
+
+计算：
+
+```text
+current_total - previous_total
+```
+
+以及：
+
+```text
+(current_total - previous_total)
+/
+previous_total
+× 100
+```
+
+如果没有上个月数据：
+
+显示：
+
+```text
+N/A
+```
+
+不要计算错误的百分比。
+
+如果 previous total = 0：
+
+不能除以 0。
+
+显示：
+
+```text
+N/A
+```
+
+---
+
+# 18. Platform Allocation
+
+Dashboard 显示：
+
+```text
+Hong Leong Bank
+RM 42,500
+33.1%
+
+Maybank
+RM 25,000
+19.4%
+
+IBKR
+RM 35,000
+27.2%
+
+Others
+RM 26,020
+20.3%
+```
+
+公式：
+
+```text
+platform_total / total_assets × 100
+```
+
+---
+
+# 19. Product Allocation
+
+支持切换：
+
+```text
+By Platform
+By Product
+```
+
+例如：
+
+```text
+Savings
+RM 20,000
+15.6%
+
+Fixed Deposit
+RM 35,000
+27.2%
+
+Investment
+RM 40,000
+31.1%
+```
+
+---
+
+# 20. Target Allocation
+
+每个平台和产品可以配置：
+
+```text
+target_allocation_pct
+```
+
+Dashboard 或 Analytics 显示：
+
+```text
+Platform       Actual     Target      Difference
+
+Hong Leong     40%        30%         +10%
+Maybank        20%        25%         -5%
+IBKR           30%        35%         -5%
+Others         10%        10%          0%
+```
+
+Difference：
+
+```text
+actual - target
+```
+
+这个功能用于帮助资产分配。
+
+不要自动执行转账或交易。
+
+它只是分析工具。
+
+---
+
+# 21. Monthly Data Page
+
+建立：
+
+```text
+Monthly Data
+```
+
+顶部：
+
+```text
+Month:
+[ August 2026 ▼ ]
+
+[ Copy Previous Month ]
+[ Save ]
+```
+
+数据显示为：
+
+```text
+Platform / Product
+Previous
+Current
+Change
+Change %
+```
+
+例如：
+
+```text
+Hong Leong Bank
+
+Savings
+Previous: RM 8,500
+Current:  RM 9,200
+Change:   +RM 700
++8.24%
+
+Fixed Deposit
+Previous: RM 20,000
+Current:  RM 20,000
+Change:   RM 0
+0%
+```
+
+---
+
+# 22. Copy Previous Month
+
+这是非常重要的功能。
+
+例如：
+
+```text
+July
+```
+
+点击：
+
+```text
+Copy Previous Month
+```
+
+自动把 July 的 Snapshot 复制成 August 草稿数据。
+
+然后用户只修改变化的项目。
+
+注意：
+
+不能覆盖 August 已经存在的数据而不提示。
+
+必须：
+
+```text
+如果目标月份已有数据：
+
+显示确认。
+
+例如：
+
+"August already contains data. Do you want to overwrite existing snapshot values?"
+```
+
+---
+
+# 23. Monthly Status
+
+建议：
+
+```text
+draft
+finalized
+```
+
+默认：
+
+```text
+draft
+```
+
+完成月度录入后可以：
+
+```text
+Finalize Month
+```
+
+Finalized 后：
+
+* 普通编辑入口减少
+* 防止误修改
+* 如果需要修改，要求明确操作
+
+不要实现过于复杂的会计结账系统。
+
+---
+
+# 24. Platforms Page
+
+建立：
+
+```text
+Platforms
+```
+
+列表：
+
+```text
+┌─────────────────────────────────────────┐
+│ Logo  Hong Leong Bank                   │
+│       3 Products                        │
+│       RM 42,500                         │
+│                         [Edit] [View]   │
+└─────────────────────────────────────────┘
+```
+
+支持：
+
+```text
+Create
+Edit
+Deactivate
+Reorder
+Logo
+View Products
+```
+
+不要轻易 Physical Delete。
+
+如果已有历史 Snapshot：
+
+优先使用：
+
+```text
+is_active = false
+```
+
+---
+
+# 25. Products Page
+
+支持：
+
+```text
+Create
+Edit
+Deactivate
+Reorder
+Product Logo
+Product Type
+Currency
+Target Allocation
+Notes
+```
+
+如果 Product 已经存在历史数据：
+
+不要直接删除导致历史数据断裂。
+
+使用：
+
+```text
+is_active = false
+```
+
+---
+
+# 26. Analytics Page
+
+建立：
+
+```text
+Analytics
+```
+
+提供：
+
+```text
+1. Total Asset Trend
+2. Platform Balance Trend
+3. Platform Allocation
+4. Allocation Over Time
+5. Monthly Change
+6. Monthly Comparison Table
+7. Target vs Actual
+```
+
+---
+
+# 27. Chart 1 — Total Asset Curve
+
+必须有：
+
+```text
+Total Asset Trend
+```
+
+X：
+
+```text
+Month
+```
+
+Y：
+
+```text
+Base Currency Amount
+```
+
+必须按时间排序。
+
+例如：
+
+```text
+Jan
+Feb
+Mar
+Apr
+May
+Jun
+```
+
+不要把月份按照字符串错误排序。
+
+---
+
+# 28. Chart 2 — Platform Balance Trend
+
+允许选择：
+
+```text
+All Platforms
+```
+
+或者单独选择：
+
+```text
+Hong Leong
+Maybank
+IBKR
+```
+
+显示多条时间曲线。
+
+---
+
+# 29. Chart 3 — Current Platform Allocation
+
+显示当前选定月份：
+
+```text
+Platform Share of Total Assets
+```
+
+建议使用：
+
+```text
+Donut
+```
+
+或当前项目已有等价图表组件。
+
+---
+
+# 30. Chart 4 — Allocation Over Time
+
+目标：
+
+查看资产结构随时间变化。
+
+例如：
+
+```text
+Hong Leong
+Maybank
+IBKR
+Others
+```
+
+按照百分比展示。
+
+可以使用：
+
+```text
+100% Stacked Area
+```
+
+或其他等价图表。
+
+---
+
+# 31. Chart 5 — Monthly Change
+
+显示：
+
+```text
+Month-over-Month Change
+```
+
+例如：
+
+```text
+Jan → Feb
+Feb → Mar
+Mar → Apr
+```
+
+使用 Bar Chart。
+
+---
+
+# 32. Monthly Comparison Table
+
+必须实现一个非常重要的表格：
+
+```text
+Platform / Product | Jan | Feb | Mar | Apr | May | Jun
+```
+
+例如：
+
+```text
+Hong Leong              20k   22k   21k   25k   27k   30k
+  Savings                8k    9k    9k   10k   11k   12k
+  Fixed Deposit          12k   13k   12k   15k   16k   18k
+
+Maybank                 15k   16k   17k   18k   18k   19k
+
+IBKR                    30k   31k   35k   34k   38k   40k
+
+Total                   65k   69k   73k   77k   83k   89k
+```
+
+要求：
+
+* Horizontal scrolling
+* Sticky first column
+* Platform expandable/collapsible
+* Product nested under Platform
+* Monthly totals
+* Current month highlight
+* Change indication
+* Responsive design
+
+---
+
+# 33. Filters
+
+Analytics 支持：
+
+```text
+Date Range
+Platform
+Product
+Product Type
+Currency
+```
+
+例如：
+
+```text
+Jan 2026 → Aug 2026
+```
+
+或者：
+
+```text
+Hong Leong only
+```
+
+---
+
+# 34. Financial Summary Calculations
+
+实现以下计算。
+
+## Total Assets
+
+```text
+SUM(base_amount)
+```
+
+按照：
+
+```text
+user
++
+month
+```
+
+聚合。
+
+---
+
+## Platform Total
+
+```text
+SUM(base_amount)
+GROUP BY platform
+```
+
+---
+
+## Product Total
+
+```text
+SUM(base_amount)
+GROUP BY product
+```
+
+---
+
+## Platform Allocation
+
+```text
+platform_total / total_assets * 100
+```
+
+---
+
+## Product Allocation
+
+```text
+product_total / total_assets * 100
+```
+
+---
+
+## MoM Change
+
+```text
+current_month - previous_month
+```
+
+---
+
+## MoM %
+
+```text
+change / previous_month * 100
+```
+
+如果 previous = 0：
+
+```text
+N/A
+```
+
+---
+
+## Target Difference
+
+```text
+actual_allocation - target_allocation
+```
+
+---
+
+# 35. Performance
+
+不要每打开 Dashboard 都执行大量无关查询。
+
+可以根据需求设计：
+
+```text
+Aggregated SQL Queries
+```
+
+例如：
+
+```text
+monthly total
+platform total
+product total
+trend data
+```
+
+优先让 SQL 完成 aggregation，而不是拉出大量数据后全部在 frontend 计算。
+
+Cloudflare D1 支持 SQLite 语义以及 Worker Binding API，因此可以直接通过 SQL 聚合相关数据。([Cloudflare Docs][1])
+
+根据查询方式给常用过滤/连接字段建立合理索引。([Cloudflare Docs][2])
+
+---
+
+# 36. API Design
+
+根据当前项目 API 规范建立对应接口。
+
+建议：
+
+```text
+GET    /api/financial/dashboard
+
+GET    /api/financial/platforms
+POST   /api/financial/platforms
+PATCH  /api/financial/platforms/:id
+POST   /api/financial/platforms/:id/deactivate
+
+GET    /api/financial/products
+POST   /api/financial/products
+PATCH  /api/financial/products/:id
+POST   /api/financial/products/:id/deactivate
+
+GET    /api/financial/months
+GET    /api/financial/months/:month
+
+POST   /api/financial/months/:month/copy-previous
+
+GET    /api/financial/snapshots
+POST   /api/financial/snapshots
+PATCH  /api/financial/snapshots/:id
+
+GET    /api/financial/analytics
+```
+
+实际命名以项目现有 API 风格为准。
+
+不要机械复制这个命名。
+
+---
+
+# 37. Authorization
+
+所有数据必须按照当前登录用户隔离。
+
+例如：
+
+```text
+user A
+```
+
+绝不能通过 API 查询：
+
+```text
+user B
+```
+
+Frontend 隐藏按钮不算权限控制。
+
+Backend 必须验证：
+
+```text
+authenticated user
++
+resource belongs to current user
+```
+
+Admin API 如果已有系统权限设计，则继续复用。
+
+---
+
+# 38. Database Safety
+
+所有 Database Schema 修改：
+
+```text
+必须创建新的 migration
+```
+
+不要修改已经执行的旧 migration。
+
+例如：
+
+```text
+001_create_financial_platforms.sql
+002_create_financial_products.sql
+003_create_financial_periods.sql
+004_create_financial_snapshots.sql
+005_add_target_allocation.sql
+```
+
+实际编号根据当前项目 migration 顺序决定。
+
+---
+
+# 39. Foreign Keys
+
+建立：
+
+```text
+financial_products.platform_id
+    → financial_platforms.id
+
+financial_periods.user_id
+    → users.id
+
+financial_snapshots.period_id
+    → financial_periods.id
+
+financial_snapshots.product_id
+    → financial_products.id
+```
+
+使用 foreign key 保证引用关系有效。
+
+Cloudflare D1 支持 foreign key enforcement，因此优先使用数据库级约束，而不是完全依赖 JavaScript。([Cloudflare Docs][3])
+
+---
+
+# 40. Delete Strategy
+
+不要直接删除有历史记录的：
+
+```text
+Platform
+Product
+```
+
+优先：
+
+```text
+is_active = false
+```
+
+这样：
+
+```text
+2026-01
+2026-02
+2026-03
+```
+
+的历史数据仍然完整。
+
+只有确认没有任何历史引用的数据，才考虑 physical delete。
+
+---
+
+# 41. UI Design
+
+严格复用当前项目的 Design System。
+
+如果当前系统已经使用：
+
+```text
+Glassmorphism
+Soft UI
+Minimal
+Premium Dashboard
+Rounded Cards
+```
+
+继续使用，而不要重新发明设计。
+
+要求：
+
+```text
+Minimal
+Premium
+Clean
+Information-dense but readable
+Responsive
+Desktop-first
+Mobile-friendly
+```
+
+Dashboard 优先展示重要数字。
+
+不要使用大量装饰元素。
+
+---
+
+# 42. Dashboard Layout
+
+推荐：
+
+```text
+┌─────────────────────────────────────────────────┐
+│ Monthly Financial Overview                      │
+│ August 2026 ▼                                   │
+├─────────────────────────────────────────────────┤
+│ Total Assets       Monthly Change     Allocation│
+│ RM 128,520         +RM 5,240         100%       │
+├─────────────────────────────────────────────────┤
+│                                                 │
+│              Total Asset Trend                  │
+│                                                 │
+├────────────────────────┬────────────────────────┤
+│ Platform Allocation    │ Monthly Changes        │
+│                        │                        │
+├────────────────────────┴────────────────────────┤
+│ Platform / Product Monthly Comparison           │
+└─────────────────────────────────────────────────┘
+```
+
+---
+
+# 43. Data Entry UX
+
+月度录入必须尽量减少操作。
+
+优先：
+
+```text
+Choose Month
+↓
+Copy Previous Month
+↓
+Edit Changed Values
+↓
+Save
+```
+
+不要要求用户逐条重新建立 Product。
+
+---
+
+# 44. Input Validation
+
+必须验证：
+
+```text
+amount >= 0
+fx_rate > 0
+target_allocation >= 0
+target_allocation <= 100
+month_key valid
+currency valid
+platform exists
+product exists
+product belongs to current user
+```
+
+禁止：
+
+```text
+NaN
+Infinity
+negative balance
+invalid month
+```
+
+是否允许负资产必须按照明确的业务模型处理。
+
+第一版默认：
+
+```text
+balance >= 0
+```
+
+---
+
+# 45. Currency Formatting
+
+所有金额显示统一使用：
+
+```text
+Currency
+Amount
+```
+
+例如：
+
+```text
+RM 12,500.00
+USD 5,000.00
+```
+
+Dashboard 总资产统一使用 Base Currency。
+
+详细产品页面可以同时显示：
+
+```text
+Native Amount
+Converted Amount
+FX Rate
+```
+
+---
+
+# 46. Empty States
+
+首次使用：
+
+```text
+No financial data yet.
+
+Create your first platform.
+```
+
+无 Product：
+
+```text
+No products under this platform.
+```
+
+无月度数据：
+
+```text
+No snapshot recorded for this month.
+```
+
+不要展示大量空白图表。
+
+---
+
+# 47. Error Handling
+
+API 出错时：
+
+不要只显示：
+
+```text
+Error
+```
+
+显示用户可理解的信息。
+
+例如：
+
+```text
+Unable to save August balance.
+Please try again.
+```
+
+同时在开发环境记录实际 error。
+
+---
+
+# 48. Testing
+
+至少测试：
+
+## User Isolation
+
+```text
+User A
+不能读取
+User B
+数据
+```
+
+## Platform
+
+```text
+Create
+Edit
+Deactivate
+Logo
+```
+
+## Product
+
+```text
+Create
+Edit
+Deactivate
+Platform association
+Currency
+Target allocation
+```
+
+## Snapshot
+
+```text
+Create
+Edit
+Update
+Copy previous month
+```
+
+## Calculations
+
+测试：
+
+```text
+Total
+Platform Total
+Product Total
+Allocation
+MoM
+MoM %
+Target Difference
+FX conversion
+```
+
+---
+
+# 49. Edge Cases
+
+必须测试：
+
+```text
+只有一个 Platform
+
+一个 Platform 多个 Product
+
+没有 Product Snapshot
+
+部分 Product 有数据，部分没有
+
+余额 = 0
+
+Previous month = 0
+
+第一个月没有 Previous Month
+
+不同 Currency
+
+FX rate = 1
+
+新增 Product
+
+Deactivate Product
+
+Deactivate Platform
+
+删除/停用之后仍然存在历史数据
+```
+
+---
+
+# 50. Performance
+
+如果历史月份越来越多：
+
+不要无限制一次返回所有明细。
+
+Analytics 支持：
+
+```text
+Date range
+Pagination where appropriate
+Aggregation
+```
+
+数据库查询要尽量使用：
+
+```text
+indexed user_id
+indexed period_id
+indexed product_id
+indexed month_key
+```
+
+具体 index 根据实际 SQL 查询计划决定，不要无意义地建立大量 index。
+
+---
+
+# 51. Documentation
+
+更新：
+
+```text
+docs/ARCHITECTURE.md
+docs/DATABASE.md
+docs/API.md
+```
+
+记录这个 Sub-App。
+
+至少包括：
+
+```text
+Purpose
+Architecture
+Database
+Data model
+Calculation rules
+Currency rules
+Snapshot rules
+API
+Authorization
+Analytics
+```
+
+---
+
+# 52. AGENTS.md
+
+更新 Agent Rules：
+
+```text
+Financial data is historical data.
+
+Do not replace monthly snapshots with a current_balance-only model.
+
+Never interpret missing snapshot as zero.
+
+Do not modify old migrations.
+
+Do not delete historical financial data by default.
+
+Platform is parent of Product.
+
+Product belongs to Platform.
+
+Snapshot belongs to Product + Month.
+
+Historical FX rate must be preserved.
+
+Always scope financial data to authenticated user.
+
+Never bypass backend authorization.
+```
+
+---
+
+# 53. Important Architectural Rule
+
+不要把：
+
+```text
+Platform
+```
+
+和：
+
+```text
+Product
+```
+
+混成一个 table。
+
+正确：
+
+```text
+Platform
+    ↓
+Product
+    ↓
+Monthly Snapshot
+```
+
+例如：
+
+```text
+Hong Leong Bank
+├── Savings
+│   ├── Jan 2026
+│   ├── Feb 2026
+│   └── Mar 2026
+│
+└── Fixed Deposit
+    ├── Jan 2026
+    ├── Feb 2026
+    └── Mar 2026
+```
+
+---
+
+# 54. 不要把 Analytics 数据永久重复保存
+
+除非性能测试证明需要。
+
+优先：
+
+```text
+Raw Snapshot Data
+        ↓
+SQL aggregation
+        ↓
+Analytics
+```
+
+不要同时保存：
+
+```text
+snapshot
++
+monthly_total
++
+platform_total
++
+allocation_total
+```
+
+然后让这些数字长期互相不同步。
+
+核心原则：
+
+> Snapshot 是 Source of Truth。
+
+统计结果应该尽可能从 Snapshot 派生。
+
+---
+
+# 55. 第一阶段 MVP
+
+第一阶段只做：
+
+```text
+1. Platform Management
+2. Product Management
+3. Monthly Snapshot
+4. Copy Previous Month
+5. Total Assets
+6. Platform Allocation
+7. Product Allocation
+8. Total Asset Trend
+9. Platform Comparison Table
+10. Monthly Change
+11. Multi-currency Base Conversion
+```
+
+---
+
+# 56. 第二阶段
+
+之后增加：
+
+```text
+1. Target Allocation
+2. Actual vs Target
+3. Allocation Over Time
+4. Platform Trend
+5. Product Trend
+6. Advanced Filters
+7. Finalize Month
+8. Better Analytics
+```
+
+---
+
+# 57. 第三阶段
+
+未来可以增加：
+
+```text
+1. FD Maturity Tracking
+2. Interest Rate
+3. Interest Income
+4. Investment Portfolio
+5. Net Worth
+6. Asset Class
+7. Monthly Contribution
+8. Monthly Withdrawal
+9. Rebalancing Suggestions
+10. Export CSV
+11. Export PDF
+```
+
+不要在第一阶段全部实现。
+
+---
+
+# 58. Vibe Coding 执行流程
+
+不要一次修改整个系统。
+
+按照：
+
+```text
+Phase 1
+Audit current system
+
+↓
+
+Phase 2
+Design database schema
+
+↓
+
+Phase 3
+Create migrations
+
+↓
+
+Phase 4
+Implement backend/API
+
+↓
+
+Phase 5
+Implement Platform management
+
+↓
+
+Phase 6
+Implement Product management
+
+↓
+
+Phase 7
+Implement Monthly Snapshot
+
+↓
+
+Phase 8
+Implement Dashboard
+
+↓
+
+Phase 9
+Implement Analytics
+
+↓
+
+Phase 10
+Testing
+
+↓
+
+Phase 11
+Documentation
+```
+
+每个阶段完成后确认现有项目没有被破坏。
+
+---
+
+# 59. Git 安全
+
+在开始修改之前：
+
+```text
+Check git status
+```
+
+不要覆盖未提交的用户工作。
+
+完成一个稳定阶段后：
+
+```text
+git diff
+```
+
+检查修改。
+
+建议形成清晰 commit：
+
+```text
+Add financial platform management
+Add financial product management
+Add monthly snapshot tracking
+Add financial dashboard
+Add financial analytics
+```
+
+不要把所有修改塞进一个无法回滚的大 commit。
+
+---
+
+# 60. 最终验收标准
+
+只有满足以下条件才算完成。
+
+## Data
+
+```text
+可以创建 Platform
+可以创建 Product
+可以记录月度余额
+可以修改月度余额
+可以复制上个月
+可以支持历史月份
+可以支持多币种
+可以使用历史 FX
+```
+
+## Analytics
+
+```text
+可以看到总资产
+可以看到月度变化
+可以看到平台资金
+可以看到产品资金
+可以看到平台占比
+可以看到产品占比
+可以看到资金曲线
+可以看到平台月度比较
+可以看到 Allocation Trend
+```
+
+## Security
+
+```text
+User data isolation works
+Admin permissions work
+Frontend checks are not the only protection
+```
+
+## Data integrity
+
+```text
+No duplicate monthly snapshot for same product
+No broken foreign keys
+No accidental historical deletion
+No missing-vs-zero confusion
+```
+
+---
+
+# 61. 最终 Agent 汇报格式
+
+完成后必须向我汇报：
+
+## Architecture
+
+```text
+当前 Sub-App 如何接入整个系统
+```
+
+## Database
+
+列出：
+
+```text
+Tables
+Columns
+Foreign Keys
+Indexes
+Unique Constraints
+Migrations
+```
+
+## API
+
+列出：
+
+```text
+Endpoint
+Method
+Purpose
+Authorization
+```
+
+## UI
+
+列出：
+
+```text
+Pages
+Components
+Dashboard
+Charts
+Forms
+```
+
+## Calculations
+
+解释：
+
+```text
+Total Assets
+Platform Allocation
+Product Allocation
+MoM
+Target Difference
+FX Conversion
+```
+
+## Testing
+
+告诉我实际测试了什么。
+
+## Files Changed
+
+列出所有修改/新增文件。
+
+## Risks
+
+列出剩余风险。
+
+## TODO
+
+列出下一阶段建议。
+
+---
+
+# 最终原则
+
+始终遵守：
+
+```text
+This is an additional Sub-App, not a rewrite.
+
+Reuse existing authentication.
+
+Reuse existing user system.
+
+Reuse existing admin system.
+
+Reuse existing design system.
+
+Platform != Product.
+
+Product != Snapshot.
+
+Snapshot is the source of truth.
+
+Missing data != zero.
+
+Historical FX must remain historical.
+
+Historical financial data must not be casually deleted.
+
+Database changes must use migrations.
+
+Backend must enforce authorization.
+
+Keep calculations consistent.
+
+Prefer derived analytics over duplicated stored totals.
+
+Keep the system simple enough for long-term Vibe Coding.
+```
+
+[1]: https://developers.cloudflare.com/d1/sql-api/sql-statements/?utm_source=chatgpt.com "SQL statements · Cloudflare D1 docs"
+[2]: https://developers.cloudflare.com/d1/best-practices/use-indexes/?utm_source=chatgpt.com "Use indexes · Cloudflare D1 docs"
+[3]: https://developers.cloudflare.com/d1/sql-api/foreign-keys/?utm_source=chatgpt.com "Define foreign keys · Cloudflare D1 docs"
