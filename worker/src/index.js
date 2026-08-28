@@ -9,7 +9,8 @@ import {
   generateSalt,
   createToken,
   getAuthenticatedUser,
-  logAdminAction
+  logAdminAction,
+  ensureUserTableSchema
 } from './auth.js';
 
 const corsHeaders = {
@@ -57,6 +58,9 @@ export default {
     if (!env.DB) {
       return errorResponse('D1 database binding "DB" is missing in wrangler.jsonc', 500);
     }
+
+    // Auto-heal database schema on the fly
+    await ensureUserTableSchema(env);
 
     try {
       if (method === 'GET' && (path === '/health' || (path === '/' && !env.ASSETS) || path === '/api')) {

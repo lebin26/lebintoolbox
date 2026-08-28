@@ -118,8 +118,66 @@ export async function verifyToken(token, secret = JWT_SECRET_DEFAULT) {
   }
 }
 
+let _schemaChecked = false;
+
+// Auto-heal / Auto-migrate users table schema if missing columns
+export async function ensureUserTableSchema(env) {
+  if (_schemaChecked || !env || !env.DB) return;
+  try {
+    const tableInfo = await env.DB.prepare("PRAGMA table_info(users)").all();
+    const columns = (tableInfo.results || []).map(r => r.name);
+
+    if (columns.length === 0) {
+      await env.DB.exec(`
+        CREATE TABLE IF NOT EXISTS users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          username TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL,
+          salt TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'user',
+          status TEXT NOT NULL DEFAULT 'active',
+          nickname TEXT,
+          avatar_url TEXT,
+          allowed_apps TEXT DEFAULT '["courtledger","financial"]',
+          app_permissions TEXT DEFAULT '["courtledger:create_bill","courtledger:delete_bill","financial:manage"]',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT OR IGNORE INTO users (username, password_hash, salt, role, status, nickname, allowed_apps, app_permissions)
+        VALUES ('lebin2626@gmail.com', 'fb77f52ecf9086d2d6f169426193b3854722de7defa68524771010ac36f33d2f', 'a8f3b29c104e76d5e21908472910cbae', 'admin', 'active', 'Lebin', '["courtledger","financial"]', '["courtledger:create_bill","courtledger:delete_bill","financial:manage","admin:manage"]');
+      `);
+    } else if (!columns.includes('username')) {
+      // Legacy users table without username column -> Auto-rebuild cleanly
+      await env.DB.exec(`
+        CREATE TABLE IF NOT EXISTS users_v2 (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          username TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL,
+          salt TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'user',
+          status TEXT NOT NULL DEFAULT 'active',
+          nickname TEXT,
+          avatar_url TEXT,
+          allowed_apps TEXT DEFAULT '["courtledger","financial"]',
+          app_permissions TEXT DEFAULT '["courtledger:create_bill","courtledger:delete_bill","financial:manage"]',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT OR IGNORE INTO users_v2 (username, password_hash, salt, role, status, nickname, allowed_apps, app_permissions)
+        VALUES ('lebin2626@gmail.com', 'fb77f52ecf9086d2d6f169426193b3854722de7defa68524771010ac36f33d2f', 'a8f3b29c104e76d5e21908472910cbae', 'admin', 'active', 'Lebin', '["courtledger","financial"]', '["courtledger:create_bill","courtledger:delete_bill","financial:manage","admin:manage"]');
+        DROP TABLE IF EXISTS users;
+        ALTER TABLE users_v2 RENAME TO users;
+      `);
+    }
+    _schemaChecked = true;
+  } catch (e) {
+    console.warn('[Auth] ensureUserTableSchema error:', e);
+  }
+}
+
 // Extract Authenticated User from Request
 export async function getAuthenticatedUser(request, env) {
+  await ensureUserTableSchema(env);
   const authHeader = request.headers.get('Authorization') || request.headers.get('X-Auth-Token') || '';
   let token = '';
 
